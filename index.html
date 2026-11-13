@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✦ 별자리 만들기 ✦</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #02010a; }
+  body {
+    font-family: 'Gowun Batang', 'Apple SD Gothic Neo', 'Malgun Gothic', serif;
+    color: #e8e6ff;
+    cursor: none;
+    user-select: none;
+  }
+  canvas { position: fixed; inset: 0; display: block; }
+
+  /* 커스텀 커서 */
+  #cursor {
+    position: fixed; width: 22px; height: 22px; pointer-events: none; z-index: 50;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(200, 210, 255, 0.7);
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(160, 180, 255, 0.6), inset 0 0 8px rgba(160, 180, 255, 0.4);
+    transition: width .2s, height .2s, border-color .2s;
+  }
+  #cursor::after {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    width: 4px; height: 4px; border-radius: 50%; background: #fff;
+    transform: translate(-50%, -50%); box-shadow: 0 0 8px #fff;
+  }
+  #cursor.active { width: 34px; height: 34px; border-color: rgba(255, 220, 150, 0.9); }
+
+  /* 제목 */
+  header {
+    position: fixed; top: 34px; left: 50%; transform: translateX(-50%);
+    text-align: center; pointer-events: none; z-index: 10;
+    animation: fadeDown 2s ease-out both;
+  }
+  header .eng {
+    font-family: 'Cinzel', serif; letter-spacing: .6em; font-size: 12px;
+    color: rgba(190, 200, 255, 0.65); margin-bottom: 10px; padding-left: .6em;
+  }
+  header h1 {
+    font-weight: 700; font-size: clamp(28px, 4.2vw, 52px); letter-spacing: .18em;
+    background: linear-gradient(120deg, #fff6d8 0%, #ffd9f2 35%, #c9d4ff 70%, #a8f0ff 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(170, 160, 255, 0.45));
+  }
+  header p {
+    margin-top: 12px; font-size: 14px; color: rgba(220, 220, 255, 0.6); letter-spacing: .08em;
+  }
+
+  /* 하단 패널 */
+  .panel {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; align-items: center; z-index: 20;
+    padding: 10px 14px; border-radius: 999px;
+    background: rgba(20, 18, 50, 0.38);
+    border: 1px solid rgba(180, 180, 255, 0.18);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 8px 40px rgba(0,0,0,.45), inset 0 0 20px rgba(140,140,255,.06);
+    animation: fadeUp 2s ease-out both .4s;
+  }
+  .panel button {
+    cursor: none; font-family: inherit; font-size: 14px; color: #e9e8ff;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(200,200,255,0.2);
+    padding: 9px 18px; border-radius: 999px; letter-spacing: .05em;
+    transition: all .25s;
+  }
+  .panel button:hover {
+    background: rgba(190, 180, 255, 0.2); border-color: rgba(220, 210, 255, 0.6);
+    box-shadow: 0 0 18px rgba(170, 160, 255, 0.45); color: #fff;
+  }
+  .panel .sep { width: 1px; height: 22px; background: rgba(200,200,255,.2); }
+  .swatch {
+    width: 20px; height: 20px; border-radius: 50%; cursor: none;
+    border: 2px solid transparent; transition: transform .2s, border-color .2s;
+  }
+  .swatch.on { border-color: #fff; transform: scale(1.2); }
+  .swatch:hover { transform: scale(1.2); }
+
+  /* 정보 */
+  #info {
+    position: fixed; top: 30px; right: 32px; z-index: 10; text-align: right;
+    font-size: 13px; color: rgba(210,210,255,.55); line-height: 1.9; pointer-events: none;
+    animation: fadeDown 2s ease-out both .6s;
+  }
+  #info b { color: #ffe9b8; font-weight: 400; }
+
+  #help {
+    position: fixed; top: 30px; left: 32px; z-index: 10; font-size: 13px;
+    color: rgba(210,210,255,.55); line-height: 1.9; pointer-events: none;
+    animation: fadeDown 2s ease-out both .6s;
+  }
+  #help span { color: #c9d4ff; }
+
+  /* 이름 짓기 모달 */
+  #nameBox {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.9);
+    z-index: 60; opacity: 0; pointer-events: none; transition: all .35s;
+    background: rgba(18, 16, 48, 0.75); border: 1px solid rgba(200,190,255,.3);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    padding: 28px 30px 24px; border-radius: 20px; text-align: center; width: 340px;
+    box-shadow: 0 0 60px rgba(140, 120, 255, .35);
+  }
+  #nameBox.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+  #nameBox h2 { font-size: 20px; margin-bottom: 6px; color: #fff3d6; }
+  #nameBox p { font-size: 13px; color: rgba(220,220,255,.6); margin-bottom: 18px; }
+  #nameBox input {
+    width: 100%; padding: 12px 16px; border-radius: 12px; outline: none;
+    font-family: inherit; font-size: 16px; text-align: center; color: #fff; cursor: text;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(200,200,255,.25);
+  }
+  #nameBox input:focus { border-color: rgba(255,220,160,.7); box-shadow: 0 0 16px rgba(255,210,150,.3); }
+  #nameBox .row { display: flex; gap: 10px; margin-top: 16px; }
+  #nameBox button {
+    flex: 1; padding: 10px; border-radius: 12px; font-family: inherit; font-size: 14px; cursor: pointer;
+    background: rgba(255,255,255,.06); color: #e8e6ff; border: 1px solid rgba(200,200,255,.25); transition: all .2s;
+  }
+  #nameBox button.primary { background: linear-gradient(120deg, rgba(255,200,150,.35), rgba(200,150,255,.35)); }
+  #nameBox button:hover { box-shadow: 0 0 16px rgba(200,180,255,.45); }
+  body.modal { cursor: default; }
+  body.modal #cursor { opacity: 0; }
+
+  #toast {
+    position: fixed; left: 50%; top: 22%; transform: translateX(-50%); z-index: 30;
+    font-size: 22px; letter-spacing: .15em; color: #fff4d6; opacity: 0; pointer-events: none;
+    text-shadow: 0 0 20px rgba(255, 210, 150, .8); transition: opacity .8s;
+  }
+  #toast.show { opacity: 1; }
+
+  @keyframes fadeDown { from { opacity: 0; transform: translate(-50%, -16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  #info, #help { animation-name: fadeIn; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  @media (max-width: 760px) {
+    #help, #info { display: none; }
+    .panel { flex-wrap: wrap; justify-content: center; border-radius: 22px; width: calc(100% - 30px); }
+  }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div id="cursor"></div>
+
+<header>
+  <div class="eng">CONSTELLATION MAKER</div>
+  <h1>별자리 만들기</h1>
+  <p>마우스를 움직여 별들을 이어보세요</p>
+</header>
+
+<div id="help">
+  <div><span>움직이기</span> · 주변 별들이 이어져요</div>
+  <div><span>클릭</span> · 별을 골라 나만의 별자리</div>
+  <div><span>더블클릭 / Enter</span> · 별자리 완성</div>
+  <div><span>Esc</span> · 그리던 별자리 취소</div>
+</div>
+
+<div id="info">
+  완성한 별자리 <b id="count">0</b>개<br>
+  <span id="last"></span>
+</div>
+
+<div id="toast"></div>
+
+<div class="panel">
+  <div class="swatch on" data-c="255,225,170" style="background:#ffe1aa"></div>
+  <div class="swatch" data-c="170,200,255" style="background:#aac8ff"></div>
+  <div class="swatch" data-c="255,170,220" style="background:#ffaadc"></div>
+  <div class="swatch" data-c="170,255,230" style="background:#aaffe6"></div>
+  <div class="swatch" data-c="210,180,255" style="background:#d2b4ff"></div>
+  <div class="sep"></div>
+  <button id="finishBtn">✦ 별자리 완성</button>
+  <button id="undoBtn">↶ 되돌리기</button>
+  <button id="clearBtn">☾ 모두 지우기</button>
+</div>
+
+<div id="nameBox">
+  <h2>✧ 새로운 별자리 ✧</h2>
+  <p>밤하늘에 남길 이름을 지어주세요</p>
+  <input id="nameInput" maxlength="16" placeholder="예) 고양이자리">
+  <div class="row">
+    <button id="cancelName">취소</button>
+    <button id="okName" class="primary">하늘에 새기기</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('sky');
+  const ctx = cv.getContext('2d');
+  const cursorEl = document.getElementById('cursor');
+  let W, H, DPR;
+
+  const mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999, inside: false };
+  let stars = [];          // 메인(연결 가능) 별
+  let dust = [];           // 배경 미세 별
+  let shooting = [];
+  let sparks = [];
+  let nebulaCanvas;
+  let current = [];        // 그리는 중인 별자리 (star 인덱스 배열)
+  let constellations = []; // {pts:[idx], color, name, born}
+  let color = '255,225,170';
+  let t = 0;
+
+  const LINK_RADIUS = () => Math.min(220, Math.max(140, Math.min(W, H) * 0.22));
+  const STAR_LINK = 110;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W * DPR; cv.height = H * DPR;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    build();
+  }
+
+  const starColors = ['255,255,255', '200,215,255', '255,240,215', '180,200,255', '255,225,200', '220,210,255'];
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function build() {
+    // 기존 별자리 좌표를 비율로 유지하기 위해 별 재생성 시 초기화
+    const area = W * H;
+    const n = Math.round(area / 5200);
+    stars = [];
+    for (let i = 0; i < n; i++) {
+      const big = Math.random() < 0.08;
+      stars.push({
+        x: Math.random() * W, y: Math.random() * H,
+        bx: 0, by: 0,
+        r: big ? rand(1.6, 2.6) : rand(0.6, 1.5),
+        c: starColors[(Math.random() * starColors.length) | 0],
+        tw: rand(0.6, 2.2), ph: rand(0, Math.PI * 2),
+        depth: rand(0.2, 1), glow: 0
+      });
+    }
+    stars.forEach(s => { s.bx = s.x; s.by = s.y; });
+    dust = [];
+    for (let i = 0; i < area / 900; i++) {
+      dust.push({ x: Math.random() * W, y: Math.random() * H, r: rand(0.2, 0.7), a: rand(0.15, 0.6), ph: rand(0, 6.28) });
+    }
+    constellations = []; current = [];
+    updateInfo();
+    buildNebula();
+  }
+
+  function buildNebula() {
+    nebulaCanvas = document.createElement('canvas');
+    nebulaCanvas.width = W; nebulaCanvas.height = H;
+    const n = nebulaCanvas.getContext('2d');
+    const bg = n.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#05031a'); bg.addColorStop(0.5, '#0a0626'); bg.addColorStop(1, '#020818');
+    n.fillStyle = bg; n.fillRect(0, 0, W, H);
+
+    const clouds = [
+      [0.2, 0.3, 0.55, '110,60,200', 0.22],
+      [0.8, 0.25, 0.45, '40,90,200', 0.2],
+      [0.65, 0.75, 0.6, '200,60,150', 0.14],
+      [0.3, 0.8, 0.4, '40,140,180', 0.13],
+      [0.5, 0.5, 0.35, '150,100,255', 0.1],
+    ];
+    n.globalCompositeOperation = 'lighter';
+    clouds.forEach(([x, y, r, c, a]) => {
+      for (let k = 0; k < 6; k++) {
+        const cx = (x + rand(-0.08, 0.08)) * W, cy = (y + rand(-0.08, 0.08)) * H;
+        const rr = r * Math.max(W, H) * rand(0.4, 0.8);
+        const g = n.createRadialGradient(cx, cy, 0, cx, cy, rr);
+        g.addColorStop(0, `rgba(${c},${a * 0.5})`);
+        g.addColorStop(0.5, `rgba(${c},${a * 0.18})`);
+        g.addColorStop(1, `rgba(${c},0)`);
+        n.fillStyle = g; n.fillRect(0, 0, W, H);
+      }
+    });
+    // 은하수 띠
+    n.save();
+    n.translate(W / 2, H / 2); n.rotate(-0.45);
+    for (let i = 0; i < 1400; i++) {
+      const x = rand(-W, W), y = (Math.random() + Math.random() + Math.random() - 1.5) * H * 0.12;
+      n.fillStyle = `rgba(230,225,255,${rand(0.02, 0.18)})`;
+      n.fillRect(x, y, rand(0.4, 1.2), rand(0.4, 1.2));
+    }
+    const band = n.createLinearGradient(0, -H * 0.2, 0, H * 0.2);
+    band.addColorStop(0, 'rgba(170,150,255,0)');
+    band.addColorStop(0.5, 'rgba(170,150,255,0.06)');
+    band.addColorStop(1, 'rgba(170,150,255,0)');
+    n.fillStyle = band; n.fillRect(-W, -H * 0.2, W * 2, H * 0.4);
+    n.restore();
+    n.globalCompositeOperation = 'source-over';
+    // 비네팅
+    const v = n.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,8,0.65)');
+    n.fillStyle = v; n.fillRect(0, 0, W, H);
+  }
+
+  // ---------- 그리기 도우미 ----------
+  function drawStar(x, y, r, c, alpha, glow) {
+    const gr = r * (5 + glow * 7);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, gr);
+    g.addColorStop(0, `rgba(${c},${alpha})`);
+    g.addColorStop(0.15, `rgba(${c},${alpha * 0.45})`);
+    g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, gr, 0, 6.283); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(1, alpha + 0.2)})`;
+    ctx.beginPath(); ctx.arc(x, y, r * (1 + glow * 0.6), 0, 6.283); ctx.fill();
+    if (r > 1.6 || glow > 0.4) { // 십자 광채
+      const L = r * (6 + glow * 10);
+      ctx.strokeStyle = `rgba(${c},${alpha * 0.55})`;
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(x - L, y); ctx.lineTo(x + L, y);
+      ctx.moveTo(x, y - L); ctx.lineTo(x, y + L);
+      ctx.stroke();
+    }
+  }
+
+  function line(a, b, c, alpha, w) {
+    const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+    g.addColorStop(0, `rgba(${c},${alpha})`);
+    g.addColorStop(0.5, `rgba(${c},${alpha * 0.6})`);
+    g.addColorStop(1, `rgba(${c},${alpha})`);
+    ctx.strokeStyle = g; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+
+  function nearestStar(x, y, maxD = 40) {
+    let best = -1, bd = maxD * maxD;
+    for (let i = 0; i < stars.length; i++) {
+      const dx = stars[i].x - x, dy = stars[i].y - y, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+
+  // ---------- 메인 루프 ----------
+  function frame() {
+    t += 0.016;
+    mouse.x += (mouse.tx - mouse.x) * 0.18;
+    mouse.y += (mouse.ty - mouse.y) * 0.18;
+
+    ctx.drawImage(nebulaCanvas, 0, 0, W, H);
+
+    // 패럴랙스 오프셋
+    const px = mouse.inside ? (mouse.x / W - 0.5) : 0;
+    const py = mouse.inside ? (mouse.y / H - 0.5) : 0;
+
+    // 미세 별
+    for (const d of dust) {
+      const a = d.a * (0.6 + 0.4 * Math.sin(t * 1.3 + d.ph));
+      ctx.fillStyle = `rgba(220,225,255,${a})`;
+      ctx.fillRect(d.x - px * 6, d.y - py * 6, d.r * 2, d.r * 2);
+    }
+
+    // 별 위치 업데이트 (패럴랙스 + 커서에 살짝 끌림)
+    const R = LINK_RADIUS();
+    for (const s of stars) {
+      let x = s.bx - px * 22 * s.depth, y = s.by - py * 22 * s.depth;
+      const dx = mouse.x - x, dy = mouse.y - y, dist = Math.hypot(dx, dy);
+      let targetGlow = 0;
+      if (mouse.inside && dist < R) {
+        const f = 1 - dist / R;
+        x += dx * f * 0.06; y += dy * f * 0.06;
+        targetGlow = f;
+      }
+      s.x = x; s.y = y;
+      s.glow += (targetGlow - s.glow) * 0.12;
+    }
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // 완성된 별자리
+    constellations.forEach(cst => {
+      const age = Math.min(1, (t - cst.born) / 1.2);
+      const pulse = 0.75 + 0.25 * Math.sin(t * 1.5 + cst.born);
+      ctx.shadowColor = `rgba(${cst.color},0.9)`; ctx.shadowBlur = 12;
+      for (let i = 1; i < cst.pts.length; i++) {
+        const a = stars[cst.pts[i - 1]], b = stars[cst.pts[i]];
+        const seg = Math.max(0, Math.min(1, age * cst.pts.length - (i - 1)));
+        if (seg <= 0) continue;
+        const bx = a.x + (b.x - a.x) * seg, by = a.y + (b.y - a.y) * seg;
+        line(a, { x: bx, y: by }, cst.color, 0.75 * pulse, 1.4);
+      }
+      ctx.shadowBlur = 0;
+      cst.pts.forEach(i => { const s = stars[i]; drawStar(s.x, s.y, s.r + 0.8, cst.color, 0.95, 0.6 * pulse); });
+      // 이름
+      if (cst.name) {
+        let cx = 0, cy = 0, minY = Infinity;
+        cst.pts.forEach(i => { cx += stars[i].x; cy += stars[i].y; minY = Math.min(minY, stars[i].y); });
+        cx /= cst.pts.length;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.font = '15px "Gowun Batang", serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = `rgba(${cst.color},${0.85 * age})`;
+        ctx.shadowColor = `rgba(${cst.color},0.8)`; ctx.shadowBlur = 10;
+        ctx.fillText(cst.name, cx, minY - 22);
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'lighter';
+      }
+    });
+
+    // 커서 주변 자동 별자리
+    if (mouse.inside) {
+      const near = [];
+      for (let i = 0; i < stars.length; i++) {
+        const s = stars[i], d = Math.hypot(s.x - mouse.x, s.y - mouse.y);
+        if (d < R) near.push([i, d]);
+      }
+      near.sort((a, b) => a[1] - b[1]);
+      const pick = near.slice(0, 14);
+      // 별끼리 연결
+      for (let i = 0; i < pick.length; i++) {
+        const a = stars[pick[i][0]];
+        let links = 0;
+        for (let j = i + 1; j < pick.length && links < 3; j++) {
+          const b = stars[pick[j][0]];
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < STAR_LINK) {
+            const f = (1 - d / STAR_LINK) * (1 - pick[i][1] / R);
+            line(a, b, color, f * 0.7, 0.8);
+            links++;
+          }
+        }
+      }
+      // 커서와 가까운 별 연결
+      pick.slice(0, 5).forEach(([i, d]) => {
+        const f = 1 - d / R;
+        line({ x: mouse.x, y: mouse.y }, stars[i], color, f * 0.45, 0.6);
+      });
+      // 커서 후광
+      const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, R * 0.9);
+      g.addColorStop(0, `rgba(${color},0.08)`); g.addColorStop(1, `rgba(${color},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mouse.x, mouse.y, R * 0.9, 0, 6.283); ctx.fill();
+    }
+
+    // 별들
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const tw = 0.55 + 0.45 * Math.sin(t * s.tw + s.ph);
+      const c = s.glow > 0.05 ? color : s.c;
+      drawStar(s.x, s.y, s.r, s.glow > 0.3 ? c : s.c, Math.min(1, tw * (0.55 + s.depth * 0.4) + s.glow * 0.5), s.glow);
+    }
+
+    // 그리는 중인 별자리
+    if (current.length) {
+      ctx.shadowColor = `rgba(${color},1)`; ctx.shadowBlur = 14;
+      for (let i = 1; i < current.length; i++) line(stars[current[i - 1]], stars[current[i]], color, 0.95, 1.6);
+      // 마지막 별 → 커서 점선
+      const last = stars[current[current.length - 1]];
+      ctx.setLineDash([4, 6]); ctx.lineDashOffset = -t * 30;
+      line(last, mouse, color, 0.6, 1);
+      ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
+      current.forEach(i => {
+        const s = stars[i];
+        drawStar(s.x, s.y, s.r + 1, color, 1, 0.9);
+        ctx.strokeStyle = `rgba(${color},${0.5 + 0.3 * Math.sin(t * 4)})`; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(s.x, s.y, 9 + Math.sin(t * 4) * 2, 0, 6.283); ctx.stroke();
+      });
+    }
+
+    // 호버 대상 표시
+    const h = nearestStar(mouse.x, mouse.y, 32);
+    cursorEl.classList.toggle('active', h >= 0);
+    if (h >= 0 && mouse.inside) {
+      const s = stars[h];
+      ctx.strokeStyle = `rgba(${color},0.8)`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 12, 0, 6.283); ctx.stroke();
+    }
+
+    // 별똥별
+    if (Math.random() < 0.006) {
+      const a = rand(0.5, 1.0);
+      shooting.push({ x: rand(0, W * 1.2), y: rand(-50, H * 0.4), vx: -Math.cos(a) * rand(9, 15), vy: Math.sin(a) * rand(9, 15), life: 1 });
+    }
+    shooting = shooting.filter(s => s.life > 0);
+    shooting.forEach(s => {
+      s.x += s.vx; s.y += s.vy; s.life -= 0.012;
+      const tx = s.x - s.vx * 9, ty = s.y - s.vy * 9;
+      const g = ctx.createLinearGradient(s.x, s.y, tx, ty);
+      g.addColorStop(0, `rgba(255,255,255,${s.life})`); g.addColorStop(1, 'rgba(180,200,255,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tx, ty); ctx.stroke();
+      drawStar(s.x, s.y, 1.2, '255,255,255', s.life, 0.3);
+    });
+
+    // 반짝이 파티클
+    sparks = sparks.filter(p => p.life > 0);
+    sparks.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.96; p.vy *= 0.96; p.life -= 0.02;
+      ctx.fillStyle = `rgba(${p.c},${p.life})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0, p.r * p.life), 0, 6.283); ctx.fill();
+    });
+
+    ctx.globalCompositeOperation = 'source-over';
+    requestAnimationFrame(frame);
+  }
+
+  function burst(x, y, c, n = 22) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * 6.283, sp = rand(0.5, 3.5);
+      sparks.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: rand(1, 2.4), life: 1, c });
+    }
+  }
+
+  // ---------- UI ----------
+  const nameBox = document.getElementById('nameBox');
+  const nameInput = document.getElementById('nameInput');
+  const toast = document.getElementById('toast');
+  let modalOpen = false, pending = null;
+
+  function updateInfo() {
+    document.getElementById('count').textContent = constellations.length;
+    const last = constellations[constellations.length - 1];
+    document.getElementById('last').textContent = last && last.name ? `최근: ${last.name}` : '';
+  }
+  function showToast(msg) {
+    toast.textContent = msg; toast.classList.add('show');
+    clearTimeout(showToast._t); showToast._t = setTimeout(() => toast.classList.remove('show'), 2200);
+  }
+
+  function finish() {
+    if (current.length < 2) { showToast('별을 두 개 이상 골라주세요 ✧'); return; }
+    pending = { pts: current.slice(), color, name: '', born: t };
+    current = [];
+    modalOpen = true; document.body.classList.add('modal');
+    nameBox.classList.add('show'); nameInput.value = '';
+    setTimeout(() => nameInput.focus(), 50);
+  }
+  function closeModal(save) {
+    if (!pending) return;
+    if (save) {
+      pending.name = nameInput.value.trim() || randomName();
+      pending.born = t;
+      constellations.push(pending);
+      pending.pts.forEach(i => burst(stars[i].x, stars[i].y, pending.color, 10));
+      showToast(`✦ ${pending.name} ✦`);
+    } else {
+      current = pending.pts; // 취소 시 다시 편집 상태로
+    }
+    pending = null; modalOpen = false;
+    document.body.classList.remove('modal');
+    nameBox.classList.remove('show');
+    updateInfo();
+  }
+  const pre = ['은빛', '푸른', '잠든', '노래하는', '작은', '빛나는', '외로운', '춤추는', '꿈꾸는', '새벽'];
+  const post = ['고래', '여우', '토끼', '날개', '왕관', '나비', '사슴', '등불', '고양이', '거문고'];
+  const randomName = () => `${pre[(Math.random() * pre.length) | 0]} ${post[(Math.random() * post.length) | 0]}자리`;
+
+  // ---------- 이벤트 ----------
+  window.addEventListener('mousemove', e => {
+    mouse.tx = e.clientX; mouse.ty = e.clientY; mouse.inside = true;
+    if (mouse.x < -9000) { mouse.x = mouse.tx; mouse.y = mouse.ty; }
+    cursorEl.style.left = e.clientX + 'px'; cursorEl.style.top = e.clientY + 'px';
+  });
+  document.addEventListener('mouseleave', () => { mouse.inside = false; cursorEl.style.opacity = 0; });
+  document.addEventListener('mouseenter', () => { cursorEl.style.opacity = 1; });
+
+  window.addEventListener('touchmove', e => {
+    const p = e.touches[0]; mouse.tx = p.clientX; mouse.ty = p.clientY; mouse.inside = true;
+  }, { passive: true });
+  window.addEventListener('touchstart', e => {
+    const p = e.touches[0]; mouse.tx = mouse.x = p.clientX; mouse.ty = mouse.y = p.clientY; mouse.inside = true;
+  }, { passive: true });
+
+  cv.addEventListener('click', e => {
+    if (modalOpen) return;
+    const i = nearestStar(e.clientX, e.clientY, 36);
+    if (i < 0) { burst(e.clientX, e.clientY, '200,200,255', 8); return; }
+    if (current[current.length - 1] === i) return;
+    current.push(i);
+    burst(stars[i].x, stars[i].y, color, 16);
+  });
+  cv.addEventListener('dblclick', e => { e.preventDefault(); if (!modalOpen) finish(); });
+
+  window.addEventListener('keydown', e => {
+    if (modalOpen) {
+      if (e.key === 'Enter') closeModal(true);
+      if (e.key === 'Escape') closeModal(false);
+      return;
+    }
+    if (e.key === 'Enter') finish();
+    if (e.key === 'Escape') current = [];
+    if ((e.key === 'z' && (e.ctrlKey || e.metaKey)) || e.key === 'Backspace') undo();
+  });
+
+  function undo() {
+    if (current.length) current.pop();
+    else if (constellations.length) { constellations.pop(); updateInfo(); }
+  }
+
+  document.getElementById('finishBtn').onclick = finish;
+  document.getElementById('undoBtn').onclick = undo;
+  document.getElementById('clearBtn').onclick = () => {
+    constellations.forEach(c => c.pts.forEach(i => burst(stars[i].x, stars[i].y, c.color, 6)));
+    constellations = []; current = []; updateInfo();
+  };
+  document.getElementById('okName').onclick = () => closeModal(true);
+  document.getElementById('cancelName').onclick = () => closeModal(false);
+  document.querySelectorAll('.swatch').forEach(sw => sw.onclick = () => {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('on'));
+    sw.classList.add('on'); color = sw.dataset.c;
+  });
+
+  let rt;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 200); });
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
