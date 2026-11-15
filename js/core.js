@@ -91,7 +91,17 @@
     const W = dp[m][n];
     const extra = n - matchedSaid;
     const score = m ? Math.max(0, Math.min(100, Math.round((100 * W) / (m + 0.5 * extra)))) : 0;
-    return { score, target: T, said: S, status: tStat, extra };
+    // 화면 표시용: 원문 단어(대소문자·축약형·문장부호 그대로)에 채점 결과를 매핑
+    const words = [];
+    let k = 0;
+    for (const w of String(target).trim().split(/\s+/)) {
+      if (!w) continue;
+      const toks = normalize(w).length;
+      const st = tStat.slice(k, k + toks);
+      k += toks;
+      words.push({ w, st: !st.length || st.every((x) => x === 'ok') ? 'ok' : st.every((x) => x === 'miss') ? 'miss' : 'near' });
+    }
+    return { score, target: T, said: S, status: tStat, extra, words };
   }
 
   /* ───── 간격 반복(Leitner) ───── */

@@ -237,8 +237,8 @@
     </div>`;
   }
   function diffHtml(r) {
-    // 원문 단어 단위 표시 (정규화된 토큰 기준)
-    return r.target.map((w, i) => `<span class="${r.status[i]}">${esc(w)}</span>`).join(' ');
+    // 원문 그대로 표시 (채점은 축약형·숫자·대소문자 차이를 허용하지만 화면엔 정답 원문을 보여줌)
+    return r.words.map((x) => `<span class="${x.st}">${esc(x.w)}</span>`).join(' ');
   }
   function setImageFor(id, after) {
     const inp = document.createElement('input');

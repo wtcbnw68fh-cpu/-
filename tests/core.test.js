@@ -67,4 +67,17 @@ t('level, streak, rank', () => {
   dx['2026-11-15'] = 55; assert.strictEqual(C.streak(dx, 50, now), 3);
   assert.strictEqual(C.rankOf(0).name, 'Intern'); assert.strictEqual(C.rankOf(1200).name, 'Associate');
 });
+t('display keeps original words', () => {
+  for (const e of [...D.EXPRESSIONS, ...D.DICTATION_EXTRA]) {
+    const per = e.en.trim().split(/\s+/).flatMap((w) => C.normalize(w));
+    assert.deepStrictEqual(per, C.normalize(e.en), e.en);
+    const r = C.compare(e.en, e.en);
+    assert.strictEqual(r.words.map((x) => x.w).join(' '), e.en.trim());
+    assert.ok(r.words.every((x) => x.st === 'ok'), e.en);
+  }
+  const r = C.compare("Can we push the call back to three o'clock?", 'can we push the call to 3:00');
+  assert.strictEqual(r.words.map((x) => x.w).join(' '), "Can we push the call back to three o'clock?");
+  assert.strictEqual(r.words[5].st, 'miss');
+  assert.strictEqual(r.words[7].st, 'ok');
+});
 console.log('OK', pass, 'test groups passed');
