@@ -12,7 +12,24 @@
     'ok': 'okay', 'e-mail': 'email', 'gonna': 'going to', 'wanna': 'want to',
   };
 
-  function normalize(text) {
+  const NUM_FR = { un: '1', une: '1', deux: '2', trois: '3', quatre: '4', cinq: '5', six: '6', sept: '7', huit: '8', neuf: '9', dix: '10' };
+  const SPECIAL_FR = { weekend: 'week end', ok: 'd accord' };
+  /** 프랑스어: 악센트 무시(é→e), 엘리지옹 분리(l'eau → l eau), 숫자 통일(deux → 2) */
+  function normalizeFr(text) {
+    const s = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\u0153/g, 'oe').replace(/\u00e6/g, 'ae')
+      .replace(/[\u2018\u2019\u02bc`´']/g, ' ').replace(/-/g, ' ').replace(/[^a-z0-9\s]/g, ' ');
+    const out = [];
+    for (let w of s.split(/\s+/)) {
+      if (!w) continue;
+      if (SPECIAL_FR[w]) { out.push(...SPECIAL_FR[w].split(' ')); continue; }
+      out.push(NUM_FR[w] || w);
+    }
+    return out;
+  }
+
+  function normalize(text, lang) {
+    if (lang === 'fr') return normalizeFr(text);
     let s = String(text || '').toLowerCase()
       .replace(/[‘’ʼ`´]/g, "'")
       .replace(/[“”]/g, '"')
@@ -69,8 +86,8 @@
   }
 
   /** target 문장과 사용자가 말/입력한 문장을 비교. */
-  function compare(target, said) {
-    const T = normalize(target), S = normalize(said);
+  function compare(target, said, lang) {
+    const T = normalize(target, lang), S = normalize(said, lang);
     const m = T.length, n = S.length;
     const dp = Array.from({ length: m + 1 }, () => new Float64Array(n + 1));
     for (let i = 1; i <= m; i++) {
@@ -96,7 +113,7 @@
     let k = 0;
     for (const w of String(target).trim().split(/\s+/)) {
       if (!w) continue;
-      const toks = normalize(w).length;
+      const toks = normalize(w, lang).length;
       const st = tStat.slice(k, k + toks);
       k += toks;
       words.push({ w, st: !st.length || st.every((x) => x === 'ok') ? 'ok' : st.every((x) => x === 'miss') ? 'miss' : 'near' });
@@ -191,6 +208,8 @@
     ['drive', '🚗', '드라이브 러너', '오디오 모드 10문장 완주', (st) => st.audio >= 10],
     ['lv2', '⬆️', 'Intermediate', '레벨 2 도달', (st) => st.maxLv >= 2],
     ['lv3', '🎓', 'Advanced', '레벨 3 도달', (st) => st.maxLv >= 3],
+    ['fr1', '🥐', 'Bonjour!', '프랑스어 첫 연습', (st) => st.frAtt >= 1],
+    ['fr30', '🗼', '파리지앵', '프랑스어 30개 익히기', (st) => st.frLearned >= 30],
   ];
 
   /* ───── 면접 답변 평가 ───── */

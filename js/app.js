@@ -2,6 +2,8 @@
 (function () {
   'use strict';
   const { CATS, EXPRESSIONS, DICTATION_EXTRA, INTERVIEW } = window.APP_DATA;
+  const { FR_UNITS } = window.FR_DATA;
+  const FR_ITEMS = FR_UNITS.flatMap((u) => u.items.map((it) => Object.assign({ unit: u.id }, it)));
   const C = window.CORE;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -12,11 +14,11 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
-  const APP_VERSION = '1.2 (11/15)';
+  const APP_VERSION = '1.3 (11/15) · 프랑스어';
   const KEY = 'bizeng.v1';
   const DEF = {
     v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, dsrs: {}, iv: {}, badges: {},
-    bestStreak: 0, audio: 0, hist: {}, goalDays: {}, onboarded: false,
+    bestStreak: 0, audio: 0, hist: {}, goalDays: {}, onboarded: false, fr: { srs: {}, att: [] },
     settings: { voice: '', rate: 0.95, goal: 50, koPrompt: true },
   };
   function load() {
@@ -25,6 +27,7 @@
       if (!raw) return JSON.parse(JSON.stringify(DEF));
       const s = Object.assign(JSON.parse(JSON.stringify(DEF)), raw);
       s.settings = Object.assign({}, DEF.settings, raw.settings || {});
+      s.fr = Object.assign({ srs: {}, att: [] }, raw.fr || {});
       return s;
     } catch (e) { return JSON.parse(JSON.stringify(DEF)); }
   }
@@ -83,6 +86,10 @@
     function enVoices() { return voices.filter((v) => /^en[-_]/i.test(v.lang)); }
     function pick(lang) {
       if (lang.startsWith('ko')) return voices.find((v) => /^ko/i.test(v.lang)) || null;
+      if (lang.startsWith('fr')) {
+        const fr = voices.filter((v) => /^fr/i.test(v.lang)), ff = fr.filter((v) => /fr[-_]FR/i.test(v.lang));
+        return ff.find((v) => /(premium|enhanced|향상)/i.test(v.name)) || ff.find((v) => /(thomas|audrey|aurelie|aurélie|google)/i.test(v.name)) || ff[0] || fr[0] || null;
+      }
       if (S.settings.voice) { const v = voices.find((x) => x.voiceURI === S.settings.voice); if (v) return v; }
       const en = enVoices();
       const us = en.filter((v) => /en[-_]US/i.test(v.lang));
@@ -95,7 +102,7 @@
         const u = new SpeechSynthesisUtterance(text);
         u.lang = lang;
         const v = pick(lang); if (v) u.voice = v;
-        u.rate = (opt.rate || 1) * (lang.startsWith('en') ? S.settings.rate : 1.05);
+        u.rate = (opt.rate || 1) * (lang.startsWith('en') ? S.settings.rate : lang.startsWith('fr') ? S.settings.rate * 0.9 : 1.05);
         let done = false;
         const fin = () => { if (!done) { done = true; clearTimeout(tm); resolve(); } };
         // iOS에서 onend가 누락되는 경우 대비 안전 타이머
@@ -125,7 +132,7 @@
       stop();
       const rec = new SR();
       currentRec = rec;
-      rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = !!opt.continuous; rec.maxAlternatives = 1;
+      rec.lang = opt.lang || 'en-US'; rec.interimResults = true; rec.continuous = !!opt.continuous; rec.maxAlternatives = 1;
       let latest = '', lastChange = Date.now(), started = Date.now(), ended = false;
       let silenceT, maxT;
       const promise = new Promise((resolve, reject) => {
@@ -199,6 +206,7 @@
       attempts: a.length, bestStreak: S.bestStreak, perfect: a.filter((x) => x.s === 100).length,
       learned: Object.keys(S.srs).filter((id) => S.srs[id].best >= 70).length, totalExpr: EXPRESSIONS.length,
       dict: a.filter((x) => x.m === 'dict').length, iv: a.filter((x) => x.m === 'iv').length, audio: S.audio, maxLv: S.maxLv,
+      frAtt: S.fr.att.length, frLearned: Object.values(S.fr.srs).filter((x) => x.best >= 70).length,
     };
   }
   function checkBadges() {
@@ -481,16 +489,16 @@
     card();
   };
 
-  function sessionSummary(title, results, again) {
+  function sessionSummary(title, results, again, opts = {}) {
     const a = Math.round(C.avg(results));
     const [em, msg] = reaction(a);
     view.innerHTML = `
       <h1>${title}</h1>
       <div class="card" style="text-align:center"><div style="font-size:64px">${em}</div><div style="font-size:44px;font-weight:800">${a}<span class="muted small">점 평균</span></div><p class="muted">${esc(msg)}</p>
       <div class="row" style="justify-content:center;gap:6px;flex-wrap:wrap">${results.map((s) => `<span class="pill" style="background:${s >= 85 ? 'rgba(74,222,128,.2)' : s >= 60 ? 'rgba(251,191,36,.2)' : 'rgba(248,113,113,.2)'}">${s}</span>`).join('')}</div></div>
-      ${levelReview()}
-      <div class="grid2"><button class="primary big" data-act="again">한 세트 더</button><button class="big" data-act="home">홈으로</button></div>`;
-    bind({ again, home: () => go('home'), lvdown: () => { S.level = Math.max(1, S.level - 1); save(); toast('Level ' + S.level + '로 조정했어요'); go('home'); } });
+      ${opts.noLevel ? '' : levelReview()}
+      <div class="grid2"><button class="primary big" data-act="again">한 세트 더</button><button class="big" data-act="home">${opts.homeLabel || '홈으로'}</button></div>`;
+    bind({ again, home: () => go(opts.home || 'home'), lvdown: () => { S.level = Math.max(1, S.level - 1); save(); toast('Level ' + S.level + '로 조정했어요'); go('home'); } });
   }
 
   /* ═════════ 딕테이션 ═════════ */
@@ -616,6 +624,7 @@
     shadow: ['🗣️', '쉐도잉', '한국어 → 3초 생각 → 영어 2회(느리게). 마이크 없이 따라 말하기.'],
     listen: ['🚇', '리스닝 루프', '영어만 2회 반복 + 화면에 뜻. 지하철용.'],
     iv: ['💼', '면접 리스닝', '면접 질문 → 모범답안. 이동 중 답변 흡수.'],
+    fr: ['🇫🇷', '프랑스어 따라 말하기', '한국어 → 프랑스어 2회(느리게). 지금 배우는 단원까지.'],
   };
   ROUTES.audio = function () {
     let mode = S.settings.audioMode || 'shadow', count = S.settings.audioCount || 10;
@@ -668,13 +677,17 @@
       let queue = [];
       while (alive && (!count || done < count)) {
         if (!queue.length) {
-          queue = mode === 'iv' ? shuffle(INTERVIEW) : C.pickSession(mode === 'listen' ? ALL_DICT : EXPRESSIONS, mode === 'listen' ? S.dsrs : S.srs, S.level, 10, Date.now());
-          if (mode !== 'iv') queue = shuffle(queue);
+          queue = mode === 'fr' ? shuffle(frPool()) : mode === 'iv' ? shuffle(INTERVIEW) : C.pickSession(mode === 'listen' ? ALL_DICT : EXPRESSIONS, mode === 'listen' ? S.dsrs : S.srs, S.level, 10, Date.now());
+          if (mode !== 'iv' && mode !== 'fr') queue = shuffle(queue);
         }
         const e = queue.shift();
         skip = false;
         try {
-          if (mode === 'iv') {
+          if (mode === 'fr') {
+            set('한국어', e.e, e.ko, '프랑스어로 떠올려 보세요'); if (S.settings.koPrompt) await say(e.ko, { lang: 'ko-KR' }); await wait(2500);
+            set('FRANÇAIS', null, e.fr, '[' + e.pr + '] ' + e.ko); await say(e.fr, { lang: 'fr-FR' }); await wait(2000);
+            set('RÉPÉTEZ', null, e.fr, '따라 말하세요 [' + e.pr + ']'); await say(e.fr, { lang: 'fr-FR', rate: 0.75 }); await wait(Math.max(2500, e.fr.length * 90));
+          } else if (mode === 'iv') {
             set('QUESTION', '💼', e.q, e.ko); await say(e.q); await wait(4000);
             set('MODEL ANSWER', '⭐', e.q, e.a); await say(e.a); await wait(2000);
           } else if (mode === 'listen') {
@@ -790,6 +803,143 @@
       bind({ home: () => go('home') });
     }
   };
+
+  /* ═════════ 프랑스어 쌩기초 ═════════ */
+  const frLearned = (id) => S.fr.srs[id] && S.fr.srs[id].best >= 70;
+  function frRecUnitIdx() { const i = FR_UNITS.findIndex((u) => !u.items.every((it) => frLearned(it.id))); return i < 0 ? FR_UNITS.length - 1 : i; }
+  function frPool() { return FR_ITEMS.filter((it) => FR_UNITS.findIndex((u) => u.id === it.unit) <= frRecUnitIdx()); }
+  function frRecord(it, s) {
+    S.fr.srs[it.id] = C.srsUpdate(S.fr.srs[it.id], s, Date.now());
+    S.fr.att.push({ t: Date.now(), s });
+    if (S.fr.att.length > 2000) S.fr.att = S.fr.att.slice(-2000);
+    return record('fr', s, 0, { xpOnly: true });
+  }
+
+  ROUTES.fr = function () {
+    const total = FR_ITEMS.length, learned = FR_ITEMS.filter((it) => frLearned(it.id)).length;
+    const rec = S.fr.att.slice(-20), acc = rec.length ? Math.round(C.avg(rec.map((a) => a.s))) : null;
+    const now = Date.now(), due = FR_ITEMS.filter((it) => S.fr.srs[it.id] && S.fr.srs[it.id].due <= now).length;
+    const ri = frRecUnitIdx(), ru = FR_UNITS[ri];
+    view.innerHTML = `<h1>🇫🇷 프랑스어 쌩기초</h1>
+      <div class="hero">
+        <div class="row small"><span>익힌 단어·문장 ${learned}/${total}</span><span class="grow"></span><span>정확도 ${acc ?? '–'}</span></div>
+        <div class="bar" style="margin-top:8px"><i style="width:${(learned / total) * 100}%"></i></div>
+        <button class="primary block big" style="margin-top:14px" data-act="cont">▶︎ 이어서: ${ru.emoji} ${esc(ru.title)} 배우기</button>
+        ${learned ? `<button class="block" style="margin-top:8px" data-act="review">🔁 말하기 복습${due ? ' (' + due + '개 대기)' : ''}</button>` : ''}
+      </div>
+      <div class="card small"><b>공부 순서</b><p class="muted" style="margin:6px 0 0">각 단원 <b>① 배우기</b>(듣고 따라 말하기) → <b>② 퀴즈</b>(한국어 보고 프랑스어로 말하기). 70점 이상이면 ‘익힘’✓. 악센트(é, ç)와 대소문자는 채점에 영향 없어요. 발음 힌트는 근사치니까 꼭 소리를 듣고 따라 하세요.</p></div>
+      ${FR_UNITS.map((u, i) => { const n = u.items.filter((it) => frLearned(it.id)).length; return `<div class="card" style="${i === ri ? 'outline:2px solid var(--acc)' : ''}">
+        <div class="row"><span style="font-size:28px">${u.emoji}</span><div class="grow"><b>Unit ${i + 1}. ${esc(u.title)}</b><div class="muted small">단어 ${u.items.filter((x) => x.t === 'w').length} · 문장 ${u.items.filter((x) => x.t === 's').length}${n === u.items.length ? ' · ✅ 완료' : ''}</div></div><span class="small">${n}/${u.items.length}</span></div>
+        <div class="bar" style="margin:10px 0"><i style="width:${(n / u.items.length) * 100}%"></i></div>
+        <div class="grid2"><button data-act="learn" data-u="${u.id}">① 배우기</button><button data-act="quiz" data-u="${u.id}">② 퀴즈</button></div></div>`; }).join('')}
+      <p class="muted small">🚗 오디오 탭 → ‘프랑스어 따라 말하기’로 운전 중에도 반복할 수 있어요.</p>`;
+    const unitItems = (id) => FR_ITEMS.filter((it) => it.unit === id);
+    bind({
+      cont: () => frSession(unitItems(ru.id), 'learn', ru.title),
+      learn: (el) => frSession(unitItems(el.dataset.u), 'learn', FR_UNITS.find((u) => u.id === el.dataset.u).title),
+      quiz: (el) => frSession(shuffle(unitItems(el.dataset.u)), 'quiz', FR_UNITS.find((u) => u.id === el.dataset.u).title),
+      review: () => {
+        const seen = FR_ITEMS.filter((it) => S.fr.srs[it.id]);
+        const list = seen.slice().sort((a, b) => S.fr.srs[a.id].due - S.fr.srs[b.id].due || S.fr.srs[a.id].b - S.fr.srs[b.id].b).slice(0, 10);
+        frSession(shuffle(list), 'quiz', '복습');
+      },
+    });
+  };
+
+  function frSession(items, mode, title) {
+    const results = [];
+    let idx = 0, typing = !Speech.srOK, hinted = false, rec = null;
+    const sayFr = (t, rate) => Speech.speak(t, { lang: 'fr-FR', rate });
+    cleanupFns.push(() => { if (rec) rec.stop(); });
+
+    function card() {
+      const it = items[idx];
+      hinted = mode === 'learn';
+      const learn = mode === 'learn';
+      view.innerHTML = `${progress(idx, items.length)}
+        <div class="row muted small"><span>🇫🇷 ${esc(title)} · ${learn ? '① 배우기' : '② 퀴즈'} ${idx + 1}/${items.length}</span><span class="grow"></span><span class="pill">${it.t === 'w' ? '단어' : '문장'}</span></div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:72px;line-height:1.1">${it.e}</div>
+          ${learn ? `<div style="font-size:30px;font-weight:800;margin-top:8px">${esc(it.fr)}</div><div style="color:var(--acc);margin-top:4px">[${esc(it.pr)}]</div>` : '<div class="muted small" style="margin-top:8px">프랑스어로 말해보세요</div>'}
+          <div class="ko" style="margin-top:8px">${esc(it.ko)}</div>
+          <div id="hint" style="color:var(--acc);margin-top:6px"></div>
+          ${learn && it.note ? `<div class="tipbox" style="text-align:left">📝 ${esc(it.note)}</div>` : ''}
+        </div>
+        <div class="grid2">${learn ? '<button data-act="play">🔊 듣기</button><button data-act="slow">🐢 느리게</button>' : '<button data-act="hint">💡 발음 힌트</button><button data-act="reveal">👀 정답 듣기</button>'}</div>
+        <div id="live" class="live hidden"></div>
+        <div id="typebox" class="${typing ? '' : 'hidden'}" style="margin-top:10px"><input type="text" id="typed" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="프랑스어 입력 (악센트 생략 OK)"><button class="primary block big" style="margin-top:8px" data-act="submitTyped">제출</button></div>
+        <button id="mic" class="primary block huge ${typing ? 'hidden' : ''}" style="margin-top:10px" data-act="mic">🎤 ${learn ? '따라 말하기' : '탭하고 말하기'}</button>
+        <div class="grid2" style="margin-top:10px"><button class="ghost" data-act="toggleType">${typing ? '🎤 음성으로' : '⌨️ 입력으로'}</button><button class="ghost" data-act="skip">건너뛰기 →</button></div>
+        ${learn ? '' : '<p class="muted small">힌트/정답을 보면 최대 80점으로 기록돼요.</p>'}`;
+      bind({
+        play: () => sayFr(it.fr), slow: () => sayFr(it.fr, 0.7),
+        hint: () => { hinted = true; $('#hint').textContent = '[' + it.pr + ']'; },
+        reveal: () => { hinted = true; $('#hint').innerHTML = '<b style="font-size:22px;color:var(--text)">' + esc(it.fr) + '</b> [' + esc(it.pr) + ']'; sayFr(it.fr); },
+        toggleType: () => { typing = !typing; card(); },
+        skip: next,
+        submitTyped: () => { const v = $('#typed').value.trim(); if (!v) return toast('입력해 주세요'); evaluate(v); },
+        mic: startMic,
+      });
+      if (learn) sayFr(it.fr);
+    }
+    async function startMic(btn) {
+      if (rec) { rec.stop(); return; }
+      Speech.stop();
+      const live = $('#live'); live.classList.remove('hidden'); live.textContent = 'Écoute… 말씀하세요';
+      btn.classList.add('mic-on'); btn.textContent = '⏹ 말하기 끝내기';
+      rec = Speech.listen({ lang: 'fr-FR', noSpeechMs: 6000, onInterim: (s) => (live.textContent = s) });
+      try {
+        const said = await rec.promise; rec = null;
+        if (!said) { btn.classList.remove('mic-on'); btn.textContent = '🎤 다시 말하기'; live.textContent = '음성이 들리지 않았어요. 다시 탭해서 말해보세요.'; return; }
+        evaluate(said);
+      } catch (code) {
+        rec = null; toast(srErrorMsg(code), 5000);
+        if (code === 'not-allowed' || code === 'service-not-allowed' || code === 'unsupported' || Speech.srFails >= 2) typing = true;
+        card();
+      }
+    }
+    function evaluate(said) {
+      const it = items[idx];
+      const r = C.compare(it.fr, said, 'fr');
+      // 배우기(보고 따라 말하기)는 퀴즈보다 쉬우므로 숙련도 반영을 80점까지로 제한
+      const s = hinted ? Math.min(r.score, 80) : r.score;
+      const xp = frRecord(it, s); results.push(s);
+      showResult(it, r, s, said, xp);
+    }
+    function showResult(it, r, s, said, xp, retry) {
+      const [em, msg] = r.score === 100 ? ['😎', 'Parfait ! 완벽해요'] : r.score >= 85 ? ['🥐', 'Très bien ! 아주 좋아요'] : r.score >= 70 ? ['👍', 'Bien ! 거의 다 왔어요'] : r.score >= 50 ? ['🤏', 'Presque… 한 번 더!'] : ['🫣', 'Courage ! 천천히 다시 들어봐요'];
+      view.innerHTML = `${progress(idx + 1, items.length)}
+        <div class="card">
+          <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점</span></div><div class="muted small">${esc(msg)}${retry ? '' : ' · +' + xp + ' XP'}</div>${s !== r.score ? `<div class="muted small">${mode === 'learn' ? '보고 따라 말하기는 최대 80점 기록 → 퀴즈에서 100점 도전!' : '힌트 사용 → ' + s + '점 기록'}</div>` : ''}</div></div>
+          <h3 style="margin-top:14px">정답과 비교</h3><div class="diff">${r.words.map((x) => `<span class="${x.st}">${esc(x.w)}</span>`).join(' ')}</div>
+          <div style="color:var(--acc);margin-top:4px">[${esc(it.pr)}] · ${esc(it.ko)}</div>
+          <h3 style="margin-top:12px">내 답 (인식 결과)</h3><div class="muted">${esc(said)}</div>
+          ${it.note ? `<div class="tipbox">📝 ${esc(it.note)}</div>` : ''}
+          ${r.score < 70 ? '<p class="muted small">💡 짧은 단어는 인식이 까다로워요. 또박또박, 조금 크게 말해보세요.</p>' : ''}
+        </div>
+        <div class="grid3"><button data-act="play">🔊</button><button data-act="slow">🐢</button><button data-act="retry">🔁 다시</button></div>
+        <button class="primary block big" style="margin-top:10px" data-act="next">${idx + 1 < items.length ? '다음 →' : '결과 보기'}</button>`;
+      bind({
+        play: () => sayFr(it.fr), slow: () => sayFr(it.fr, 0.7), next,
+        retry: async (btn) => {
+          if (!Speech.srOK || typing) { const v = prompt('프랑스어로 입력하세요'); if (v) showResult(it, C.compare(it.fr, v, 'fr'), s, v, 0, true); return; }
+          btn.classList.add('mic-on'); btn.textContent = '듣는 중…';
+          try { const v = await Speech.listen({ lang: 'fr-FR', noSpeechMs: 6000 }).promise; if (v) showResult(it, C.compare(it.fr, v, 'fr'), s, v, 0, true); else { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시'; toast('음성이 들리지 않았어요'); } }
+          catch (c) { toast(srErrorMsg(c), 4000); btn.classList.remove('mic-on'); btn.textContent = '🔁 다시'; }
+        },
+      });
+      if (r.score < 100) sayFr(it.fr);
+    }
+    function next() {
+      idx++;
+      if (idx < items.length) return card();
+      if (!results.length) return go('fr');
+      sessionSummary('🇫🇷 ' + title + (mode === 'learn' ? ' · 배우기 완료' : ' · 퀴즈 완료'), results,
+        () => frSession(mode === 'quiz' ? shuffle(items) : items, mode, title),
+        { noLevel: true, home: 'fr', homeLabel: '단원 목록' });
+    }
+    card();
+  }
 
   /* ═════════ 표현 사전 ═════════ */
   ROUTES.lib = function (state) {

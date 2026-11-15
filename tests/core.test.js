@@ -80,4 +80,22 @@ t('display keeps original words', () => {
   assert.strictEqual(r.words[5].st, 'miss');
   assert.strictEqual(r.words[7].st, 'ok');
 });
+t('french normalize & data', () => {
+  const F = require('../js/fr-data.js');
+  assert.deepStrictEqual(C.normalize("De l'eau, s’il vous plaît.", 'fr'), ['de','l','eau','s','il','vous','plait']);
+  assert.strictEqual(C.compare('Ça va bien, merci.', 'ca va bien merci', 'fr').score, 100);
+  assert.strictEqual(C.compare("Une table pour deux, s'il vous plaît.", 'une table pour 2 s il vous plait', 'fr').score, 100);
+  assert.strictEqual(C.compare('Bon week-end !', 'bon weekend', 'fr').score, 100);
+  assert.strictEqual(C.compare('deux', '2', 'fr').score, 100);
+  const ids = new Set();
+  for (const u of F.FR_UNITS) for (const it of u.items) {
+    assert.ok(!ids.has(it.id), it.id); ids.add(it.id);
+    assert.ok(it.fr && it.ko && it.pr && it.e && (it.t === 'w' || it.t === 's'), it.id);
+    const r = C.compare(it.fr, it.fr, 'fr');
+    assert.strictEqual(r.score, 100, it.fr);
+    assert.strictEqual(r.words.map((x) => x.w).join(' '), it.fr);
+    assert.deepStrictEqual(it.fr.split(/\s+/).flatMap((w) => C.normalize(w, 'fr')), C.normalize(it.fr, 'fr'), it.fr);
+  }
+  assert.ok(ids.size >= 60);
+});
 console.log('OK', pass, 'test groups passed');
