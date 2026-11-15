@@ -12,6 +12,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
+  const APP_VERSION = '1.2 (11/15)';
   const KEY = 'bizeng.v1';
   const DEF = {
     v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, dsrs: {}, iv: {}, badges: {},
@@ -852,9 +853,11 @@
         <div class="grid2"><button data-act="exp">📤 백업 내보내기</button><button data-act="imp">📥 백업 불러오기</button></div>
         <button class="danger block" style="margin-top:10px" data-act="reset">모든 기록 초기화</button>
       </div>
-      <p class="muted small" style="text-align:center">BizTalk v1 · 오프라인 동작 · 서버 전송 없음</p>`;
+      <div class="card"><h3>앱 버전: ${APP_VERSION}</h3><p class="muted small">수정사항이 안 보이면 눌러주세요. 학습 기록은 그대로 유지됩니다.</p><button class="block" data-act="update">🔄 최신 버전으로 업데이트</button></div>
+      <p class="muted small" style="text-align:center">오프라인 동작 · 서버 전송 없음</p>`;
     bind({
       home: () => go('home'),
+      update: forceUpdate,
       test: () => { S.settings.voice = $('#voice').value; save(); Speech.speak("Thank you for your patience. I'll keep you posted."); },
       goal: (el) => { S.settings.goal = +el.dataset.g; save(); ROUTES.settings(); },
       lv: (el) => { S.level = +el.dataset.l; S.maxLv = Math.max(S.maxLv, S.level); save(); checkBadges(); ROUTES.settings(); toast('Level ' + S.level + ' 적용'); },
@@ -883,6 +886,17 @@
     $('#rate').oninput = (ev) => { S.settings.rate = +ev.target.value; $('#rv').textContent = S.settings.rate.toFixed(2); save(); };
     $('#ko').onchange = (ev) => { S.settings.koPrompt = ev.target.checked; save(); };
   };
+
+  /* 저장된 앱 파일(캐시)만 지우고 새로 받기 — 학습 기록(localStorage)은 건드리지 않음 */
+  async function forceUpdate() {
+    if (!navigator.onLine) return toast('인터넷 연결 후 다시 시도하세요');
+    toast('업데이트 중…', 5000);
+    try {
+      if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+      if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+    } catch (e) { /* noop */ }
+    location.replace(location.pathname + '?v=' + Date.now());
+  }
 
   /* ═════════ 시작 ═════════ */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
