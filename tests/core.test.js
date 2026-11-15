@@ -99,3 +99,13 @@ t('french normalize & data', () => {
   assert.ok(ids.size >= 60);
 });
 console.log('OK', pass, 'test groups passed');
+// 음성 파일: 앱과 동일한 해시 규칙으로 모든 문장의 파일이 존재하는지
+{
+  const fs = require('fs'), path = require('path');
+  const fnv = (str) => { let h = 0x811c9dc5; for (const b of Buffer.from(str, 'utf8')) { h ^= b; h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
+  const D = require('../js/data.js'), F = require('../js/fr-data.js');
+  const need = [...D.EXPRESSIONS.map((e) => ['en', e.en]), ...D.DICTATION_EXTRA.map((e) => ['en', e.en]), ...D.INTERVIEW.flatMap((q) => [['en', q.q], ['en', q.a]]), ...F.FR_UNITS.flatMap((u) => u.items.map((i) => ['fr', i.fr]))];
+  const miss = need.filter(([l, t]) => !fs.existsSync(path.join(__dirname, '..', 'audio', l, fnv(l + '|' + t) + '.mp3')));
+  assert.deepStrictEqual(miss, [], 'missing audio');
+  console.log('OK audio files for', need.length, 'sentences');
+}

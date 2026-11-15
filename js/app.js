@@ -14,12 +14,12 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
-  const APP_VERSION = '1.4 (11/15) · 마이크 수정';
+  const APP_VERSION = '1.5 (11/15) · AI 음성';
   const KEY = 'bizeng.v1';
   const DEF = {
     v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, dsrs: {}, iv: {}, badges: {},
     bestStreak: 0, audio: 0, hist: {}, goalDays: {}, onboarded: false, fr: { srs: {}, att: [] },
-    settings: { voice: '', rate: 0.95, goal: 50, koPrompt: true },
+    settings: { voice: '', rate: 0.95, goal: 50, koPrompt: true, natural: true },
   };
   function load() {
     try {
@@ -95,14 +95,69 @@
       const us = en.filter((v) => /en[-_]US/i.test(v.lang));
       return us.find((v) => /(premium|enhanced|향상)/i.test(v.name)) || us.find((v) => GOOD.test(v.name)) || us[0] || en[0] || null;
     }
-    function speak(text, opt = {}) {
+    /* ── 자연스러운 AI 음성 파일 (audio/<lang>/<hash>.mp3), 없으면 기기 음성으로 대체 ── */
+    const AUD = new Audio();
+    AUD.preload = 'auto';
+    const FILES = {};
+    for (const [l, arr] of Object.entries(window.AUDIO_FILES || {})) FILES[l] = new Set(arr);
+    function fnv(str) {
+      let h = 0x811c9dc5;
+      for (const b of new TextEncoder().encode(str)) { h ^= b; h = Math.imul(h, 0x01000193) >>> 0; }
+      return h.toString(16).padStart(8, '0');
+    }
+    function fileFor(text, lang) {
+      const l = lang.slice(0, 2);
+      if (S.settings.natural === false || !FILES[l]) return null;
+      const h = fnv(l + '|' + text);
+      return FILES[l].has(h) ? 'audio/' + l + '/' + h + '.mp3' : null;
+    }
+    // iOS: 첫 터치 때 오디오 재생 권한 확보 (운전 모드 등 연속 재생용)
+    let unlocked = false;
+    const unlock = () => {
+      if (unlocked) return; unlocked = true;
+      try { AUD.src = 'audio/silence.mp3'; const p = AUD.play(); if (p) p.catch(() => { unlocked = false; }); } catch (e) { unlocked = false; }
+    };
+    document.addEventListener('touchend', unlock, { capture: true });
+    document.addEventListener('click', unlock, { capture: true });
+    let audFin = null;
+    function playFile(url, rate) {
+      return new Promise((resolve) => {
+        let done = false, tm;
+        const end = (ok) => { if (done) return; done = true; clearTimeout(tm); AUD.onended = AUD.onerror = AUD.onplaying = null; audFin = null; resolve(ok); };
+        audFin = () => { try { AUD.pause(); } catch (e) { /* noop */ } end(true); };
+        AUD.onended = () => end(true);
+        AUD.onerror = () => end(false);
+        AUD.onplaying = () => {
+          clearTimeout(tm);
+          const d = isFinite(AUD.duration) ? AUD.duration : 30;
+          tm = setTimeout(() => end(true), (d / rate) * 1000 + 2500);
+        };
+        tm = setTimeout(() => end(false), 8000); // 로딩 실패 대비
+        try {
+          AUD.defaultPlaybackRate = rate; AUD.preservesPitch = true; AUD.webkitPreservesPitch = true;
+          AUD.src = url; AUD.playbackRate = rate;
+          const p = AUD.play(); if (p) p.catch(() => end(false));
+        } catch (e) { end(false); }
+      });
+    }
+    function rateFor(lang, r) { return (r || 1) * (lang.startsWith('en') ? S.settings.rate : lang.startsWith('fr') ? S.settings.rate * 0.9 : 1.05); }
+    async function speak(text, opt = {}) {
+      const lang = opt.lang || 'en-US';
+      const url = fileFor(text, lang);
+      if (url) {
+        try { synth && synth.cancel(); } catch (e) { /* noop */ }
+        if (await playFile(url, Math.max(0.5, Math.min(2, rateFor(lang, opt.rate))))) return;
+      }
+      return speakSynth(text, opt);
+    }
+    function speakSynth(text, opt = {}) {
       return new Promise((resolve) => {
         if (!synth) { resolve(); return; }
         const lang = opt.lang || 'en-US';
         const u = new SpeechSynthesisUtterance(text);
         u.lang = lang;
         const v = pick(lang); if (v) u.voice = v;
-        u.rate = (opt.rate || 1) * (lang.startsWith('en') ? S.settings.rate : lang.startsWith('fr') ? S.settings.rate * 0.9 : 1.05);
+        u.rate = rateFor(lang, opt.rate);
         let done = false;
         const fin = () => { if (!done) { done = true; clearTimeout(tm); resolve(); } };
         // iOS에서 onend가 누락되는 경우 대비 안전 타이머
@@ -114,6 +169,7 @@
     }
     function stop() {
       try { synth && synth.cancel(); } catch (e) { /* noop */ }
+      if (audFin) audFin();
       if (current) { const c = current; current = null; c.abort(); }
     }
     function beep(freq = 880, ms = 140) {
@@ -197,7 +253,7 @@
       try { startSeg(); } catch (e) { finish('start-failed'); }
       return handle;
     }
-    return { speak, stop, beep, listen, get srOK() { return !!SR; }, get srFails() { return srFails; }, enVoices, voices: () => voices, pick };
+    return { speak, speakSynth, fileFor, stop, beep, listen, get srOK() { return !!SR; }, get srFails() { return srFails; }, enVoices, voices: () => voices, pick };
   })();
 
   /** 설정의 '말 끝 감지' 값 → listen 옵션 */
@@ -658,7 +714,7 @@
         <div>${q.kw.map((k, i) => `<span class="kw ${r.hits[i] ? 'hit' : 'no'}">${r.hits[i] ? '✓' : '✗'} ${esc(k.split('|')[0])}</span>`).join('')}</div>
         <h3 style="margin-top:12px">내 답변</h3><div class="muted small">${esc(said)}</div>
       </div>
-      <div class="card"><h3>⭐ 모범 답안</h3><div class="en" style="font-size:17px">${esc(q.a)}</div>
+      <div class="card"><h3>⭐ 모범 답안</h3><p class="muted small" style="margin-top:0">🔊 음성은 [ ] 부분을 예시(five years, semiconductors 등)로 읽어요.</p><div class="en" style="font-size:17px">${esc(q.a)}</div>
         <div class="grid2" style="margin-top:10px"><button data-act="model">🔊 듣기</button><button data-act="modelSlow">🐢 느리게</button></div></div>
       <div class="grid2"><button class="primary big" data-act="again">🔁 다시 답변</button><button class="big" data-act="list">목록</button></div>`;
     bind({ model: () => Speech.speak(q.a), modelSlow: () => Speech.speak(q.a, { rate: 0.75 }), again: () => ivQuestion(q), list: () => go('iv') });
@@ -1030,10 +1086,13 @@
     const cur = (Speech.pick('en-US') || {}).voiceURI || '';
     view.innerHTML = `<div class="row"><button class="ghost" data-act="home">‹ 홈</button><h1 class="grow" style="margin:0 0 0 8px">⚙️ 설정</h1></div>
       <div class="card">
-        <label>영어 음성</label>
+        <label><input type="checkbox" id="natural" ${S.settings.natural !== false ? 'checked' : ''}> 🎧 자연스러운 AI 음성 사용 (권장)</label>
+        <p class="muted small" style="margin:4px 0 0">앱 안 모든 영어·프랑스어 문장을 미리 녹음된 AI 음성으로 재생해요. 무음 스위치가 켜져 있어도 소리가 나요.</p>
+        <div class="row small" style="margin-top:8px"><span id="offl" class="grow muted">오프라인 음성 확인 중…</span><button style="min-height:38px;padding:6px 12px" data-act="dlaudio">⬇️ 모두 저장</button></div>
+        <button style="margin-top:8px" data-act="test">🔊 미리 듣기</button>
+        <label>기기 음성 (AI 음성이 없는 문장·한국어용)</label>
         <select id="voice">${vs.length ? vs.map((v) => `<option value="${esc(v.voiceURI)}" ${v.voiceURI === cur ? 'selected' : ''}>${esc(v.name)} (${esc(v.lang)})${/(premium|enhanced|향상)/i.test(v.name) ? ' ★' : ''}</option>`).join('') : '<option>기본 음성</option>'}</select>
         <button style="margin-top:8px" data-act="test">🔊 미리 듣기</button>
-        <div class="tipbox">🎙️ <b>더 자연스러운 음성 받기</b><br>iPhone 설정 → 손쉬운 사용 → 콘텐츠 읽어주기(읽기 및 말하기) → 음성 → 영어 → <b>Ava / Zoe / Evan (프리미엄·향상됨)</b> 다운로드 후 이 앱을 다시 열면 목록에 ★로 표시돼요 (iOS 버전에 따라 웹에 노출되지 않을 수 있음).</div>
         <label>말하기 속도: <span id="rv">${S.settings.rate.toFixed(2)}</span>×</label>
         <input type="range" id="rate" min="0.6" max="1.3" step="0.05" value="${S.settings.rate}" style="width:100%">
  <label>🎤 말 끝 감지 (마이크가 너무 빨리 꺼지면 '여유' 또는 '수동')</label>
@@ -1058,6 +1117,7 @@
     bind({
       home: () => go('home'),
       update: forceUpdate,
+      dlaudio: (b) => { b.disabled = true; prefetchAudio(true).then(() => { b.disabled = false; }); },
       endm: (el) => { S.settings.endMode = el.dataset.k; save(); ROUTES.settings(); toast('말 끝 감지: ' + el.textContent); },
       test: () => { S.settings.voice = $('#voice').value; save(); Speech.speak("Thank you for your patience. I'll keep you posted."); },
       goal: (el) => { S.settings.goal = +el.dataset.g; save(); ROUTES.settings(); },
@@ -1086,6 +1146,8 @@
     $('#voice').onchange = (ev) => { S.settings.voice = ev.target.value; save(); };
     $('#rate').oninput = (ev) => { S.settings.rate = +ev.target.value; $('#rv').textContent = S.settings.rate.toFixed(2); save(); };
     $('#ko').onchange = (ev) => { S.settings.koPrompt = ev.target.checked; save(); };
+    $('#natural').onchange = (ev) => { S.settings.natural = ev.target.checked; save(); };
+    audioStatus();
   };
 
   /* 저장된 앱 파일(캐시)만 지우고 새로 받기 — 학습 기록(localStorage)은 건드리지 않음 */
@@ -1094,15 +1156,49 @@
     toast('업데이트 중…', 5000);
     try {
       if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
-      if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+      if (window.caches) for (const k of await caches.keys()) if (k !== AUDIO_CACHE) await caches.delete(k);
     } catch (e) { /* noop */ }
     location.replace(location.pathname + '?v=' + Date.now());
+  }
+
+  /* ═════════ 오프라인 음성 저장 (지하철용) ═════════ */
+  const AUDIO_CACHE = 'biztalk-audio-v1';
+  function allAudioUrls() {
+    const out = [];
+    for (const [l, arr] of Object.entries(window.AUDIO_FILES || {})) for (const h of arr) out.push(new URL('audio/' + l + '/' + h + '.mp3', location.href).href);
+    return out;
+  }
+  async function audioStatus() {
+    const el = $('#offl'); if (!el || !window.caches) return;
+    try {
+      const have = new Set((await (await caches.open(AUDIO_CACHE)).keys()).map((r) => r.url));
+      const all = allAudioUrls();
+      const n = all.filter((u) => have.has(u)).length;
+      el.textContent = n >= all.length ? '✅ 오프라인 음성 ' + n + '개 모두 저장됨' : '오프라인 음성 ' + n + '/' + all.length + ' 저장됨';
+    } catch (e) { el.textContent = ''; }
+  }
+  let prefetching = false;
+  async function prefetchAudio(verbose) {
+    if (prefetching || !window.caches || !navigator.onLine) { if (verbose && !navigator.onLine) toast('인터넷 연결 후 다시 시도하세요'); return; }
+    prefetching = true;
+    try {
+      const c = await caches.open(AUDIO_CACHE);
+      const have = new Set((await c.keys()).map((r) => r.url));
+      const todo = allAudioUrls().filter((u) => !have.has(u));
+      let i = 0;
+      for (const u of todo) {
+        try { const r = await fetch(u); if (r.ok) await c.put(u, r); } catch (e) { break; }
+        if (verbose && ++i % 10 === 0) { const el = $('#offl'); if (el) el.textContent = '저장 중… ' + i + '/' + todo.length; }
+      }
+      if (verbose) toast('✅ 오프라인 음성 저장 완료');
+    } finally { prefetching = false; audioStatus(); }
   }
 
   /* ═════════ 시작 ═════════ */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => { /* 오프라인 캐시 실패해도 앱은 동작 */ });
   }
+  setTimeout(() => prefetchAudio(false), 6000); // 백그라운드로 음성 파일 저장
   const startTab = (location.hash || '').replace('#', '');
   go(ROUTES[startTab] ? startTab : 'home');
 })();
