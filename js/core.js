@@ -138,18 +138,25 @@
     return st;
   }
 
-  /** 세션 출제: 복습 대상 먼저, 그 다음 새 표현(낮은 레벨·빈도순), 그래도 부족하면 덜 익힌 순 */
-  function pickSession(items, srs, level, n, now) {
-    const elig = items.filter((x) => x.lv <= level);
+  /** 세션 출제
+   * - 새 문장: 현재 레벨 → 바로 아래 레벨 → … 순 (같은 레벨 안에서는 자주 쓰는 순서)
+   * - 복습 대상(기한 도래)은 최대 40%까지 섞음
+   * - maxLv: 출제 가능한 최고 레벨 (기본 = level). 주제별 연습처럼 전 레벨을 열 때 3 */
+  function pickSession(items, srs, level, n, now, maxLv) {
+    const top = maxLv || level;
+    const elig = items.filter((x) => x.lv <= top);
+    const pos = new Map(items.map((x, i) => [x, i]));
+    const rank = (x) => (x.lv === level ? 0 : x.lv < level ? level - x.lv : 10 + x.lv);
+    const byLevel = (a, b) => rank(a) - rank(b) || pos.get(a) - pos.get(b);
     const due = elig.filter((x) => srs[x.id] && srs[x.id].due <= now).sort((a, b) => srs[a.id].due - srs[b.id].due);
-    const fresh = elig.filter((x) => !srs[x.id]).sort((a, b) => a.lv - b.lv);
-    const maxDue = fresh.length ? Math.ceil(n * 0.6) : n;
+    const fresh = elig.filter((x) => !srs[x.id]).sort(byLevel);
+    const maxDue = fresh.length ? Math.ceil(n * 0.4) : n;
     const out = due.slice(0, maxDue);
     for (const x of fresh) { if (out.length >= n) break; out.push(x); }
     for (const x of due.slice(maxDue)) { if (out.length >= n) break; out.push(x); }
     if (out.length < n) {
-      const rest = elig.filter((x) => !out.includes(x))
-        .sort((a, b) => (srs[a.id] ? srs[a.id].b : 0) - (srs[b.id] ? srs[b.id].b : 0) || (srs[a.id] ? srs[a.id].due : 0) - (srs[b.id] ? srs[b.id].due : 0));
+      const box = (x) => (srs[x.id] ? srs[x.id].b : 0);
+      const rest = elig.filter((x) => !out.includes(x)).sort((a, b) => rank(a) - rank(b) || box(a) - box(b) || (srs[a.id] ? srs[a.id].due : 0) - (srs[b.id] ? srs[b.id].due : 0));
       for (const x of rest) { if (out.length >= n) break; out.push(x); }
     }
     return out;

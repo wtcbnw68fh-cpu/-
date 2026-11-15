@@ -111,6 +111,29 @@ t('daily 1000: unique, self-match 100, original text shown', () => {
   }
   assert.strictEqual(n, 1000);
 });
+t('session follows current level', () => {
+  const now = Date.now();
+  for (const lv of [1, 2, 3]) {
+    const sess = C.pickSession(D.EXPRESSIONS, {}, lv, 10, now);
+    assert.ok(sess.every((x) => x.lv === lv), 'level ' + lv + ' got ' + sess.map((x) => x.lv));
+  }
+  // 현재 레벨을 다 풀면 아래 레벨로
+  const srs = {}; for (const e of D.EXPRESSIONS) if (e.lv === 3) srs[e.id] = { b: 3, due: now + 1e9 };
+  assert.ok(C.pickSession(D.EXPRESSIONS, srs, 3, 10, now).every((x) => x.lv === 2));
+  // 주제별(전 레벨 개방): 현재 레벨 먼저
+  assert.strictEqual(C.pickSession(D.EXPRESSIONS, {}, 2, 5, now, 3)[0].lv, 2);
+});
+t('daily sentences: each level gets its own set', () => {
+  const DD = require('../js/daily-data.js');
+  const DAILY = DD.DAILY_TOPICS.flatMap((t) => t.items.map(([en], i) => ({ id: t.id + '-' + i, lv: DD.levelOf(i), topic: t.id, en })));
+  const now = Date.now(), seen = new Set();
+  for (const lv of [1, 2, 3]) {
+    const sess = C.pickSession(DAILY, {}, lv, 10, now);
+    assert.ok(sess.every((x) => x.lv === lv));
+    sess.forEach((x) => { assert.ok(!seen.has(x.id)); seen.add(x.id); });
+  }
+  assert.deepStrictEqual([1, 2, 3].map((l) => DAILY.filter((x) => x.lv === l).length), [320, 360, 320]);
+});
 console.log('OK', pass, 'test groups passed');
 // 음성 파일: 앱과 동일한 해시 규칙으로 모든 문장의 파일이 존재하는지
 {

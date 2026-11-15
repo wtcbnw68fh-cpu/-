@@ -3,9 +3,9 @@
   'use strict';
   const { CATS, EXPRESSIONS, INTERVIEW } = window.APP_DATA;
   const { FR_UNITS } = window.FR_DATA;
-  const { DAILY_TOPICS } = window.DAILY_DATA;
+  const { DAILY_TOPICS, levelOf } = window.DAILY_DATA;
   CATS.daily = '일상회화';
-  const DAILY = DAILY_TOPICS.flatMap((t) => t.items.map(([en, ko], i) => ({ id: t.id + '-' + String(i + 1).padStart(2, '0'), lv: 1, cat: 'daily', topic: t.id, en, ko, m: [t.e, t.title] })));
+  const DAILY = DAILY_TOPICS.flatMap((t) => t.items.map(([en, ko], i) => ({ id: t.id + '-' + String(i + 1).padStart(2, '0'), lv: levelOf(i), cat: 'daily', topic: t.id, en, ko, m: [t.e, t.title] })));
   const storeOf = (e) => (e.cat === 'daily' ? S.csrs : S.srs);
   const FR_ITEMS = FR_UNITS.flatMap((u) => u.items.map((it) => Object.assign({ unit: u.id }, it)));
   const C = window.CORE;
@@ -17,7 +17,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
-  const APP_VERSION = '2.1 (11/15) · 테마 · 다시 말하기';
+  const APP_VERSION = '2.2 (11/15) · 레벨별 출제 · 일상회화 개편';
   const KEY = 'bizeng.v1';
   const DEF = {
     v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, csrs: {}, dsrs: {}, iv: {}, badges: {},
@@ -562,14 +562,16 @@
     const dueDaily = DAILY.filter((e) => S.csrs[e.id] && S.csrs[e.id].due <= now).length;
     const learned = (store, list) => list.filter((e) => store[e.id] && store[e.id].best >= 70).length;
     view.innerHTML = `<h1>🎤 스피킹</h1>
+      <div class="chips">${[1, 2, 3].map((l) => `<button data-act="lv" data-l="${l}" class="${S.level === l ? 'on' : ''}">Lv${l} ${C.LEVELS[l]}</button>`).join('')}</div>
+      <p class="muted small" style="margin-top:0">선택한 레벨 문장이 먼저 나와요. 다 익히면 아래 레벨 복습으로 넘어갑니다.</p>
       <button class="tile primary block" data-act="biz" style="margin-bottom:10px"><span class="ic">💼</span>비즈니스 · 특허 실무 10문장<span class="sub" style="color:#dbe6ff">익힘 ${learned(S.srs, EXPRESSIONS)}/${EXPRESSIONS.length}${dueBiz ? ' · 복습 ' + dueBiz + '개 대기' : ''} · Lv${S.level}</span></button>
-      <button class="tile block" data-act="daily" style="margin-bottom:10px"><span class="ic">☕</span>일상 회화 10문장<span class="sub">익힘 ${learned(S.csrs, DAILY)}/${DAILY.length}${dueDaily ? ' · 복습 ' + dueDaily + '개 대기' : ''} · 자주 쓰는 순서</span></button>
+      <button class="tile block" data-act="daily" style="margin-bottom:10px"><span class="ic">☕</span>일상 회화 10문장<span class="sub">익힘 ${learned(S.csrs, DAILY)}/${DAILY.length}${dueDaily ? ' · 복습 ' + dueDaily + '개 대기' : ''} · Lv${S.level} 중심</span></button>
       <h2>☕ 일상 회화 주제별 (${DAILY_TOPICS.length}개 주제)</h2>
       ${DAILY_TOPICS.map((t) => { const list = DAILY.filter((e) => e.topic === t.id); const n = learned(S.csrs, list); return `<button class="list-item" data-act="topic" data-t="${t.id}"><span class="em">${t.e}</span><span class="grow"><b>${esc(t.title)}</b><div class="bar" style="margin-top:6px;height:6px"><i style="width:${(n / list.length) * 100}%"></i></div></span><span class="small muted">${n}/${list.length}</span></button>`; }).join('')}`;
     const runBiz = () => speakSession(C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now()), '💼 비즈니스 스피킹', runBiz);
-    const runDaily = () => speakSession(C.pickSession(DAILY, S.csrs, 3, 10, Date.now()), '☕ 일상 회화', runDaily);
-    const runTopic = (id) => { const t = DAILY_TOPICS.find((x) => x.id === id); const list = DAILY.filter((e) => e.topic === id); speakSession(C.pickSession(list, S.csrs, 3, 10, Date.now()), t.e + ' ' + t.title, () => runTopic(id)); };
-    bind({ biz: runBiz, daily: runDaily, topic: (el) => runTopic(el.dataset.t) });
+    const runDaily = () => speakSession(C.pickSession(DAILY, S.csrs, S.level, 10, Date.now()), '☕ 일상 회화', runDaily);
+    const runTopic = (id) => { const t = DAILY_TOPICS.find((x) => x.id === id); const list = DAILY.filter((e) => e.topic === id); speakSession(C.pickSession(list, S.csrs, S.level, 10, Date.now(), 3), t.e + ' ' + t.title, () => runTopic(id)); };
+    bind({ biz: runBiz, daily: runDaily, topic: (el) => runTopic(el.dataset.t), lv: (el) => { S.level = +el.dataset.l; S.maxLv = Math.max(S.maxLv, S.level); save(); checkBadges(); ROUTES.speak(); } });
   };
 
   function speakSession(items, title, again) {
@@ -836,7 +838,7 @@
       let queue = [];
       while (alive && (!count || done < count)) {
         if (!queue.length) {
-          queue = mode === 'fr' ? shuffle(frPool()) : mode === 'iv' ? shuffle(INTERVIEW) : (daily ? C.pickSession(DAILY, S.csrs, 3, 10, Date.now()) : C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now()));
+          queue = mode === 'fr' ? shuffle(frPool()) : mode === 'iv' ? shuffle(INTERVIEW) : (daily ? C.pickSession(DAILY, S.csrs, S.level, 10, Date.now()) : C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now()));
           if (mode !== 'iv' && mode !== 'fr') queue = shuffle(queue);
         }
         const e = queue.shift();
