@@ -14,7 +14,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
-  const APP_VERSION = '1.3 (11/15) · 프랑스어';
+  const APP_VERSION = '1.4 (11/15) · 마이크 수정';
   const KEY = 'bizeng.v1';
   const DEF = {
     v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, dsrs: {}, iv: {}, badges: {},
@@ -77,7 +77,7 @@
     const synth = window.speechSynthesis;
     let voices = [];
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let currentRec = null, actx = null, srFails = 0;
+    let current = null, actx = null, srFails = 0;
 
     function loadVoices() { try { voices = synth ? synth.getVoices() : []; } catch (e) { voices = []; } }
     if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
@@ -114,7 +114,7 @@
     }
     function stop() {
       try { synth && synth.cancel(); } catch (e) { /* noop */ }
-      if (currentRec) { try { currentRec.abort(); } catch (e) { /* noop */ } currentRec = null; }
+      if (current) { const c = current; current = null; c.abort(); }
     }
     function beep(freq = 880, ms = 140) {
       try {
@@ -126,42 +126,88 @@
       } catch (e) { /* noop */ }
       return sleep(ms + 60);
     }
-    /** 음성 인식. {promise, stop}. 실패 시 promise reject(errorCode) */
+    /** 음성 인식. {promise, stop}. 실패 시 promise reject(errorCode)
+     * - iPhone 인식기가 문장 중간 쉼에서 스스로 끝나도, 사용자가 아직 말하는 중이면 자동으로 이어서 듣는다.
+     * - 종료 조건: ⏹ 버튼 / 마지막 말 이후 침묵(silenceMs, 문장이 덜 끝났으면 +1.5초) / 최대 시간
+     * - manual: 침묵 감지 없이 ⏹ 버튼으로만 종료 */
     function listen(opt = {}) {
       if (!SR) return { promise: Promise.reject('unsupported'), stop() {} };
       stop();
-      const rec = new SR();
-      currentRec = rec;
-      rec.lang = opt.lang || 'en-US'; rec.interimResults = true; rec.continuous = !!opt.continuous; rec.maxAlternatives = 1;
-      let latest = '', lastChange = Date.now(), started = Date.now(), ended = false;
-      let silenceT, maxT;
-      const promise = new Promise((resolve, reject) => {
+      const manual = !!opt.manual;
+      const silence = opt.silenceMs || 2500;
+      const noSpeech = opt.noSpeechMs || 8000;
+      const expect = opt.expectWords || 0;
+      let committed = '', seg = '', lastChange = Date.now(), started = Date.now();
+      let finished = false, userStop = false, errCode = null, rec = null, fastEnds = 0, segStart = 0;
+      let resolveP, rejectP, timer, maxT, failsafe;
+      const promise = new Promise((res, rej) => { resolveP = res; rejectP = rej; });
+      const text = () => (committed + ' ' + seg).replace(/\s+/g, ' ').trim();
+      function finish(err) {
+        if (finished) return;
+        finished = true; clearInterval(timer); clearTimeout(maxT); clearTimeout(failsafe);
+        try { rec && rec.abort(); } catch (e) { /* noop */ }
+        if (current === handle) current = null;
+        const t = text();
+        if (err && !t) { srFails++; rejectP(err); } else { srFails = 0; resolveP(t); }
+      }
+      function shouldEnd() {
+        if (manual) return false;
+        const t = text();
+        if (!t) return Date.now() - started > noSpeech;
+        const words = t.split(' ').length;
+        const need = expect && words < expect * 0.7 ? silence + 1500 : silence;
+        return Date.now() - lastChange > need;
+      }
+      function requestEnd() {
+        userStop = true;
+        try { rec && rec.stop(); } catch (e) { finish(); }
+        clearTimeout(failsafe); failsafe = setTimeout(() => finish(), 1500); // onend가 안 오는 iOS 대비
+      }
+      function startSeg() {
+        rec = new SR();
+        rec.lang = opt.lang || 'en-US'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+        seg = ''; segStart = Date.now();
         rec.onresult = (e) => {
-          let s = '';
-          for (let i = 0; i < e.results.length; i++) s += e.results[i][0].transcript + ' ';
-          s = s.replace(/\s+/g, ' ').trim();
-          if (s !== latest) { latest = s; lastChange = Date.now(); opt.onInterim && opt.onInterim(s); }
+          let s2 = '';
+          for (let i = 0; i < e.results.length; i++) s2 += e.results[i][0].transcript + ' ';
+          s2 = s2.trim();
+          if (s2 !== seg) { seg = s2; lastChange = Date.now(); opt.onInterim && opt.onInterim(text()); }
         };
         rec.onerror = (e) => {
-          ended = true; cleanup();
-          if (e.error === 'no-speech' || e.error === 'aborted') resolve(latest);
-          else { srFails++; reject(e.error || 'error'); }
+          if (e.error === 'no-speech' || e.error === 'aborted') return;
+          errCode = e.error || 'error';
+          if (/not-allowed|service-not-allowed|audio-capture/.test(errCode)) finish(errCode); // 권한 문제는 즉시 종료
         };
-        rec.onend = () => { ended = true; cleanup(); srFails = 0; resolve(latest); };
-        function cleanup() { clearInterval(silenceT); clearTimeout(maxT); if (currentRec === rec) currentRec = null; }
-        // 침묵 감지: 말이 끝나고 일정 시간 변화 없으면 자동 종료 (iOS는 자동 종료가 늦을 때가 있음)
-        const silence = opt.silenceMs || (opt.continuous ? 0 : 1600);
-        if (silence) silenceT = setInterval(() => {
-          const quiet = Date.now() - lastChange;
-          if (!ended && ((latest && quiet > silence) || (!latest && Date.now() - started > (opt.noSpeechMs || 7000)))) { try { rec.stop(); } catch (e) { /* noop */ } }
-        }, 250);
-        maxT = setTimeout(() => { try { rec.stop(); } catch (e) { /* noop */ } }, opt.maxMs || 15000);
-        try { rec.start(); } catch (e) { cleanup(); reject('start-failed'); }
-      });
-      return { promise, stop() { try { rec.stop(); } catch (e) { /* noop */ } } };
+        rec.onend = () => {
+          committed = text(); seg = '';
+          if (finished) return;
+          if (errCode) return finish(errCode);
+          if (userStop || shouldEnd()) return finish();
+          // 아직 말하는 중 → 이어서 듣기 (즉시 끝나는 상황이 반복되면 중단)
+          fastEnds = Date.now() - segStart < 400 ? fastEnds + 1 : 0;
+          if (fastEnds > 3) return finish();
+          try { startSeg(); } catch (e) { finish(); }
+        };
+        rec.start();
+      }
+      const handle = { promise, stop: requestEnd, abort: () => finish() };
+      current = handle;
+      timer = setInterval(() => { if (!finished && !userStop && shouldEnd()) requestEnd(); }, 250);
+      maxT = setTimeout(requestEnd, opt.maxMs || (manual ? 60000 : 30000));
+      try { startSeg(); } catch (e) { finish('start-failed'); }
+      return handle;
     }
     return { speak, stop, beep, listen, get srOK() { return !!SR; }, get srFails() { return srFails; }, enVoices, voices: () => voices, pick };
   })();
+
+  /** 설정의 '말 끝 감지' 값 → listen 옵션 */
+  function endOpts(extra) {
+    const m = S.settings.endMode || 'normal';
+    const o = m === 'manual' ? { manual: true } : { silenceMs: { fast: 1500, normal: 2500, relaxed: 4000 }[m] || 2500 };
+    return Object.assign(o, extra || {});
+  }
+  const listenHint = () => (S.settings.endMode === 'manual' ? '듣는 중… 말을 마치면 ⏹ 버튼을 누르세요' : '듣는 중… 말씀하세요 (끝나면 잠시 멈추면 자동 종료)');
+  const wc = (t) => String(t).trim().split(/\s+/).length;
 
   function srErrorMsg(code) {
     if (code === 'not-allowed' || code === 'service-not-allowed')
@@ -428,9 +474,9 @@
     async function startMic(btn) {
       if (recHandle) { recHandle.stop(); return; }
       Speech.stop();
-      const live = $('#live'); live.classList.remove('hidden'); live.textContent = '듣는 중… 말씀하세요';
+      const live = $('#live'); live.classList.remove('hidden'); live.textContent = listenHint();
       btn.classList.add('mic-on'); btn.textContent = '⏹ 말하기 끝내기';
-      recHandle = Speech.listen({ onInterim: (s) => (live.textContent = s) });
+      recHandle = Speech.listen(endOpts({ expectWords: wc(items[idx].en), onInterim: (s) => (live.textContent = s) }));
       try {
         const said = await recHandle.promise;
         recHandle = null;
@@ -477,7 +523,7 @@
             const v = prompt('영어로 입력하세요'); if (v) showResult(e, C.compare(e.en, v), s, v, 0, true); return;
           }
           btn.classList.add('mic-on'); btn.textContent = '듣는 중…';
-          try { const v = await Speech.listen().promise; if (v) showResult(e, C.compare(e.en, v), s, v, 0, true); else { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시 말하기'; toast('음성이 들리지 않았어요'); } }
+          try { const v = await Speech.listen(endOpts({ expectWords: wc(e.en) })).promise; if (v) showResult(e, C.compare(e.en, v), s, v, 0, true); else { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시 말하기'; toast('음성이 들리지 않았어요'); } }
           catch (c) { toast(srErrorMsg(c), 4000); btn.classList.remove('mic-on'); btn.textContent = '🔁 다시 말하기'; }
         },
         next: () => { idx++; if (idx < items.length) card(); else summary(); },
@@ -584,7 +630,7 @@
         await Speech.beep();
         btn.classList.add('mic-on'); btn.textContent = '⏹ 답변 끝내기';
         t0 = Date.now(); text = '';
-        rec = Speech.listen({ continuous: true, maxMs: 180000, onInterim: (s) => { text = s; $('#live').textContent = s; } });
+        rec = Speech.listen({ manual: true, maxMs: 180000, onInterim: (s) => { text = s; $('#live').textContent = s; } });
         try {
           const said = await rec.promise; rec = null;
           const sec = (Date.now() - t0) / 1000;
@@ -702,7 +748,7 @@
               await Speech.beep();
               set('🎤 LISTENING', '🎤', e.ko, '말씀하세요…');
               let said = '';
-              try { said = await Speech.listen({ noSpeechMs: 6000, onInterim: (s) => alive && ($('#sb').textContent = s) }).promise; srStreakFail = 0; }
+              try { said = await Speech.listen({ silenceMs: S.settings.endMode === 'relaxed' || S.settings.endMode === 'manual' ? 4000 : 2500, expectWords: wc(e.en), noSpeechMs: 6000, onInterim: (s) => alive && ($('#sb').textContent = s) }).promise; srStreakFail = 0; }
               catch (c) {
                 srStreakFail++;
                 if (srStreakFail >= 2) { mode = 'shadow'; await say('Voice recognition is not working. Switching to shadowing mode.'); toast(srErrorMsg(c), 5000); continue; }
@@ -775,7 +821,8 @@
           mic: async (b) => {
             if (h) { h.stop(); return; }
             b.classList.add('mic-on'); b.textContent = '⏹ 끝내기';
-            h = Speech.listen({ onInterim: (s) => ($('#live').textContent = s) });
+            $('#live').textContent = listenHint();
+            h = Speech.listen(endOpts({ expectWords: wc(e.en), onInterim: (s) => ($('#live').textContent = s) }));
             try { const s = await h.promise; h = null; if (!s) { b.classList.remove('mic-on'); b.textContent = '🎤 다시 말하기'; return; } finishItem(C.compare(e.en, s).score); }
             catch (c) { h = null; toast(srErrorMsg(c), 4000); plan[idx] = { type: 'dict', e, lv: it.lv }; step(); }
           },
@@ -885,9 +932,9 @@
     async function startMic(btn) {
       if (rec) { rec.stop(); return; }
       Speech.stop();
-      const live = $('#live'); live.classList.remove('hidden'); live.textContent = 'Écoute… 말씀하세요';
+      const live = $('#live'); live.classList.remove('hidden'); live.textContent = listenHint();
       btn.classList.add('mic-on'); btn.textContent = '⏹ 말하기 끝내기';
-      rec = Speech.listen({ lang: 'fr-FR', noSpeechMs: 6000, onInterim: (s) => (live.textContent = s) });
+      rec = Speech.listen(endOpts({ lang: 'fr-FR', expectWords: wc(items[idx].fr), onInterim: (s) => (live.textContent = s) }));
       try {
         const said = await rec.promise; rec = null;
         if (!said) { btn.classList.remove('mic-on'); btn.textContent = '🎤 다시 말하기'; live.textContent = '음성이 들리지 않았어요. 다시 탭해서 말해보세요.'; return; }
@@ -924,7 +971,7 @@
         retry: async (btn) => {
           if (!Speech.srOK || typing) { const v = prompt('프랑스어로 입력하세요'); if (v) showResult(it, C.compare(it.fr, v, 'fr'), s, v, 0, true); return; }
           btn.classList.add('mic-on'); btn.textContent = '듣는 중…';
-          try { const v = await Speech.listen({ lang: 'fr-FR', noSpeechMs: 6000 }).promise; if (v) showResult(it, C.compare(it.fr, v, 'fr'), s, v, 0, true); else { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시'; toast('음성이 들리지 않았어요'); } }
+          try { const v = await Speech.listen(endOpts({ lang: 'fr-FR', expectWords: wc(it.fr) })).promise; if (v) showResult(it, C.compare(it.fr, v, 'fr'), s, v, 0, true); else { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시'; toast('음성이 들리지 않았어요'); } }
           catch (c) { toast(srErrorMsg(c), 4000); btn.classList.remove('mic-on'); btn.textContent = '🔁 다시'; }
         },
       });
@@ -989,6 +1036,9 @@
         <div class="tipbox">🎙️ <b>더 자연스러운 음성 받기</b><br>iPhone 설정 → 손쉬운 사용 → 콘텐츠 읽어주기(읽기 및 말하기) → 음성 → 영어 → <b>Ava / Zoe / Evan (프리미엄·향상됨)</b> 다운로드 후 이 앱을 다시 열면 목록에 ★로 표시돼요 (iOS 버전에 따라 웹에 노출되지 않을 수 있음).</div>
         <label>말하기 속도: <span id="rv">${S.settings.rate.toFixed(2)}</span>×</label>
         <input type="range" id="rate" min="0.6" max="1.3" step="0.05" value="${S.settings.rate}" style="width:100%">
+ <label>🎤 말 끝 감지 (마이크가 너무 빨리 꺼지면 '여유' 또는 '수동')</label>
+        <div class="chips">${[['fast', '빠름 1.5초'], ['normal', '보통 2.5초'], ['relaxed', '여유 4초'], ['manual', '수동 (⏹ 눌러 종료)']].map(([k, v]) => `<button data-act="endm" data-k="${k}" class="${(S.settings.endMode || 'normal') === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+        <p class="muted small">수동이어도 운전 모드는 핸즈프리라 4초 침묵 시 자동 종료돼요.</p>
         <label><input type="checkbox" id="ko" ${S.settings.koPrompt ? 'checked' : ''}> 쉐도잉 모드에서 한국어 뜻 읽어주기</label>
       </div>
       <div class="card">
@@ -1008,6 +1058,7 @@
     bind({
       home: () => go('home'),
       update: forceUpdate,
+      endm: (el) => { S.settings.endMode = el.dataset.k; save(); ROUTES.settings(); toast('말 끝 감지: ' + el.textContent); },
       test: () => { S.settings.voice = $('#voice').value; save(); Speech.speak("Thank you for your patience. I'll keep you posted."); },
       goal: (el) => { S.settings.goal = +el.dataset.g; save(); ROUTES.settings(); },
       lv: (el) => { S.level = +el.dataset.l; S.maxLv = Math.max(S.maxLv, S.level); save(); checkBadges(); ROUTES.settings(); toast('Level ' + S.level + ' 적용'); },
