@@ -9,7 +9,7 @@
   const PRON_S = new Set(['it', 'that', 'what', 'there', 'he', 'she', 'here', 'who', 'where', 'how', 'let']);
   const SPECIAL = {
     "can't": 'cannot', "won't": 'will not', "shan't": 'shall not', "let's": 'let us',
-    'ok': 'okay', 'e-mail': 'email', 'gonna': 'going to', 'wanna': 'want to',
+    'ok': 'okay', 'e-mail': 'email', wifi: 'wi fi', 'wi-fi': 'wi fi', 'gonna': 'going to', 'wanna': 'want to',
   };
 
   const NUM_FR = { un: '1', une: '1', deux: '2', trois: '3', quatre: '4', cinq: '5', six: '6', sept: '7', huit: '8', neuf: '9', dix: '10',
@@ -212,6 +212,7 @@
     ['drive', '🚗', '드라이브 러너', '오디오 모드 10문장 완주', (st) => st.audio >= 10],
     ['lv2', '⬆️', 'Intermediate', '레벨 2 도달', (st) => st.maxLv >= 2],
     ['lv3', '🎓', 'Advanced', '레벨 3 도달', (st) => st.maxLv >= 3],
+    ['c100', '☕', '수다쟁이', '일상 회화 100문장 익히기', (st) => st.daily >= 100],
     ['fr1', '🥐', 'Bonjour!', '프랑스어 첫 연습', (st) => st.frAtt >= 1],
     ['fr30', '🗼', '파리지앵', '프랑스어 30개 익히기', (st) => st.frLearned >= 30],
   ];

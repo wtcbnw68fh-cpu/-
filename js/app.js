@@ -3,6 +3,10 @@
   'use strict';
   const { CATS, EXPRESSIONS, INTERVIEW } = window.APP_DATA;
   const { FR_UNITS } = window.FR_DATA;
+  const { DAILY_TOPICS } = window.DAILY_DATA;
+  CATS.daily = '일상회화';
+  const DAILY = DAILY_TOPICS.flatMap((t) => t.items.map(([en, ko], i) => ({ id: t.id + '-' + String(i + 1).padStart(2, '0'), lv: 1, cat: 'daily', topic: t.id, en, ko, m: [t.e, t.title] })));
+  const storeOf = (e) => (e.cat === 'daily' ? S.csrs : S.srs);
   const FR_ITEMS = FR_UNITS.flatMap((u) => u.items.map((it) => Object.assign({ unit: u.id }, it)));
   const C = window.CORE;
   const $ = (s, el = document) => el.querySelector(s);
@@ -13,10 +17,10 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
-  const APP_VERSION = '1.6 (11/15) · 스피킹 집중';
+  const APP_VERSION = '2.0 (11/15) · 일상회화 1000';
   const KEY = 'bizeng.v1';
   const DEF = {
-    v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, dsrs: {}, iv: {}, badges: {},
+    v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, csrs: {}, dsrs: {}, iv: {}, badges: {},
     bestStreak: 0, audio: 0, hist: {}, goalDays: {}, onboarded: false, fr: { srs: {}, att: [] },
     settings: { voice: '', rate: 0.95, goal: 50, koPrompt: true, natural: true },
   };
@@ -310,6 +314,7 @@
       attempts: a.length, bestStreak: S.bestStreak, perfect: a.filter((x) => x.s === 100).length,
       learned: Object.keys(S.srs).filter((id) => S.srs[id].best >= 70).length, totalExpr: EXPRESSIONS.length,
       speak: a.filter((x) => x.m === 'speak').length, iv: a.filter((x) => x.m === 'iv').length, audio: S.audio, maxLv: S.maxLv,
+      daily: Object.values(S.csrs).filter((x) => x.best >= 70).length,
       frAtt: S.fr.att.length, frLearned: Object.values(S.fr.srs).filter((x) => x.best >= 70).length,
     };
   }
@@ -335,6 +340,25 @@
   }
 
   /* ═════════ 공통 컴포넌트 ═════════ */
+  /** 영국 국기(왼쪽) + 프랑스 국기(오른쪽)를 사선으로 이어 붙인 엠블럼 */
+  function flagPair(id, cls, aspect) {
+    return `<svg class="${cls || ''}" viewBox="0 0 105 30" preserveAspectRatio="${aspect || 'xMidYMid meet'}" aria-hidden="true">
+      <defs><clipPath id="uj${id}"><rect width="62" height="30"/></clipPath>
+      <clipPath id="ut${id}"><path d="M31,15 h31 v15 z v15 h-31 z h-31 v-15 z v-15 h31 z"/></clipPath>
+      <clipPath id="fr${id}"><path d="M60,0 L105,0 L105,30 L50,30 Z"/></clipPath></defs>
+      <g clip-path="url(#uj${id})"><rect width="62" height="30" fill="#012169"/>
+        <path d="M0,0 L62,30 M62,0 L0,30" stroke="#fff" stroke-width="6"/>
+        <path d="M0,0 L62,30 M62,0 L0,30" clip-path="url(#ut${id})" stroke="#C8102E" stroke-width="4"/>
+        <path d="M31,0 v30 M0,15 h62" stroke="#fff" stroke-width="10"/><path d="M31,0 v30 M0,15 h62" stroke="#C8102E" stroke-width="6"/></g>
+      <g clip-path="url(#fr${id})"><rect x="50" width="22" height="30" fill="#0055A4"/><rect x="72" width="16" height="30" fill="#fff"/><rect x="88" width="17" height="30" fill="#EF4135"/></g>
+      <path d="M60,0 L50,30" stroke="#fff" stroke-width="1.6"/></svg>`;
+  }
+  document.body.insertAdjacentHTML('afterbegin', `<header id="brand">${flagPair('b', 'flag')}<div class="grow"><div class="t">BizTalk</div><div class="s">Patent English · Français</div></div><button id="gear" aria-label="설정">⚙️</button></header>`);
+  function stampHtml(score) {
+    if (score >= 85) return '<div class="stamp granted">등록결정<small>GRANTED</small></div>';
+    if (score >= 60) return '<div class="stamp amend">보정요구<small>AMEND</small></div>';
+    return '<div class="stamp rejected">거절결정<small>REJECTED</small></div>';
+  }
   function imgKey(id) { return 'bizeng.img.' + id; }
   function getImg(id) { try { return localStorage.getItem(imgKey(id)); } catch (e) { return null; } }
   function memeCard(e, opt = {}) {
@@ -394,6 +418,7 @@
     try { (ROUTES[tab] || ROUTES.home)(arg); } catch (e) { reportErr(e); if (tab !== 'home') ROUTES.home(); }
   }
   $$('#tabs button').forEach((b) => (b.onclick = () => go(b.dataset.tab)));
+  $('#gear').onclick = () => go('settings');
 
   /* ═════════ 홈 ═════════ */
   function avgOf(m, n = 20) { const a = S.attempts.filter((x) => x.m === m).slice(-n); return a.length ? Math.round(C.avg(a.map((x) => x.s))) : null; }
@@ -454,22 +479,28 @@
     view.innerHTML = `
       ${!standalone ? `<div class="card" style="border:1px dashed var(--acc)"><b>📲 홈 화면에 추가하세요</b><p class="muted small">Safari 하단 공유 버튼 <b>⬆︎</b> → <b>홈 화면에 추가</b>. 앱처럼 바로 실행되고 오프라인(지하철)에서도 동작해요.</p></div>` : ''}
       ${!S.onboarded ? `<div class="card"><b>👋 처음이시네요!</b><p class="muted small">3분짜리 <b>실력 점검</b>으로 시작 레벨을 정해 드릴게요. (건너뛰면 Level 1부터)</p><div class="row"><button class="primary grow" data-act="test">실력 점검 시작</button><button class="ghost" data-act="skipOnb">건너뛰기</button></div></div>` : ''}
-      <div class="hero">
-        <div class="row"><span class="pill">${rk.icon} ${rk.name}</span><span class="pill">Lv${S.level} ${C.LEVELS[S.level]}</span><span class="grow"></span><button class="ghost" style="min-height:36px;padding:6px 10px" data-act="settings">⚙️</button></div>
-        <div style="margin:14px 0 4px" class="muted small">BizTalk Score</div>
-        <div class="row" style="align-items:flex-end"><div class="score">${score}</div><div class="muted">/1000</div><span class="grow"></span>
-          ${delta != null ? `<div class="delta" style="color:${delta >= 0 ? 'var(--ok)' : 'var(--bad)'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)} <span class="muted small">(7일 전 대비)</span></div>` : ''}</div>
-        <div style="margin-top:14px" class="row small"><span>오늘 목표 ${tXp}/${goal} XP</span><span class="grow"></span><span>🔥 ${stk}일 연속</span></div>
-        <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, (tXp / goal) * 100)}%"></i></div>
-        ${rk.next ? `<div class="muted small" style="margin-top:8px">다음 직급 ${rk.nextName}까지 ${rk.next - S.xp} XP</div>` : ''}
+      <div class="cert">
+        <div class="ribbon"><i class="uk"></i><i class="fr"></i></div>
+        <div class="frame">
+          <div class="head">CERTIFICATE OF PROFICIENCY<span>비즈니스 영어 · 프랑스어 실력 등록증</span></div>
+          <div class="no">등록번호 제 10-${new Date().getFullYear()}-${String(score).padStart(7, '0')} 호</div>
+          <div class="small muted">BizTalk Score</div>
+          <div class="row" style="align-items:flex-end;gap:6px"><div class="score">${score}</div><div class="muted" style="margin-bottom:6px">/1000</div></div>
+          ${delta != null ? `<div class="small" style="font-weight:700;color:${delta >= 0 ? '#15803d' : '#b91c1c'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)} <span class="muted">(7일 전 대비)</span></div>` : ''}
+          <div class="kv">권리자 등급 <b>${rk.icon} ${rk.name}</b> · 심사 단계 <b>Lv${S.level} ${C.LEVELS[S.level]}</b></div>
+          <div class="row small" style="margin-top:12px"><span>오늘 목표 ${tXp}/${goal} XP</span><span class="grow"></span><span>🔥 ${stk}일 연속</span></div>
+          <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, (tXp / goal) * 100)}%"></i></div>
+          ${rk.next ? `<div class="muted small" style="margin-top:8px">다음 직급 ${rk.nextName}까지 ${rk.next - S.xp} XP</div>` : ''}
+          <div class="seal">BIZTALK<b>${rk.icon}</b>IP OFFICE</div>
+        </div>
       </div>
       <div class="grid2">
-        <button class="tile primary" data-act="speak"><span class="ic">🎤</span>스피킹 10문장<span class="sub" style="color:#e0e7ff">${due ? '복습 ' + due + '개 대기 중' : '새 표현 + 복습'}</span></button>
+        <button class="tile primary" data-act="speak"><span class="ic">🎤</span>스피킹<span class="sub" style="color:#e0e7ff">비즈니스 ${EXPRESSIONS.length} · 일상 ${DAILY.length}${due ? ' · 복습 ' + due : ''}</span></button>
         <button class="tile" data-act="fr"><span class="ic">🇫🇷</span>프랑스어<span class="sub">왕초보 말하기</span></button>
         <button class="tile" data-act="audio"><span class="ic">🚗</span>운전/지하철 모드<span class="sub">핸즈프리 반복</span></button>
         <button class="tile" data-act="iv"><span class="ic">💼</span>영어 면접<span class="sub">답변 피드백</span></button>
       </div>
-      <h2>📈 점수 변화</h2>
+      <h2>§1 점수 변화 · 심사 경과</h2>
       <div class="card">${chartSvg()}</div>
       <div class="grid3">
         <div class="stat"><b>${sp ?? '–'}</b><span>스피킹 정확도</span></div>
@@ -477,9 +508,9 @@
         <div class="stat"><b>${iv ?? '–'}</b><span>면접 점수</span></div>
       </div>
       <p class="muted small">최근 20회 평균. Score = 레벨 기본점(0/300/600) + 최근 30회 평균×4</p>
-      <h2>🏅 배지</h2>
+      <h2>§2 배지 · 등록 특허</h2>
       <div class="badges">${C.BADGES.map(([id, e, name, desc]) => `<div class="badge ${S.badges[id] ? 'got' : ''}" title="${esc(desc)}"><span class="e">${e}</span>${esc(name)}</div>`).join('')}</div>
-      <h2>📚 더보기</h2>
+      <h2>§3 부속 서류</h2>
       <button class="list-item" data-act="lib"><span class="em">🗂️</span><span class="grow">표현 사전 <span class="muted small">· ${EXPRESSIONS.length}개 · 짤 넣기</span></span>›</button>
       <button class="list-item" data-act="test"><span class="em">🩺</span><span class="grow">실력 점검 다시 하기</span>›</button>
       <button class="list-item" data-act="settings"><span class="em">⚙️</span><span class="grow">설정 · 음성 · 백업</span>›</button>
@@ -494,7 +525,22 @@
 
   /* ═════════ 스피킹 세션 ═════════ */
   ROUTES.speak = function () {
-    const items = C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now());
+    const now = Date.now();
+    const dueBiz = EXPRESSIONS.filter((e) => e.lv <= S.level && S.srs[e.id] && S.srs[e.id].due <= now).length;
+    const dueDaily = DAILY.filter((e) => S.csrs[e.id] && S.csrs[e.id].due <= now).length;
+    const learned = (store, list) => list.filter((e) => store[e.id] && store[e.id].best >= 70).length;
+    view.innerHTML = `<h1>🎤 스피킹</h1>
+      <button class="tile primary block" data-act="biz" style="margin-bottom:10px"><span class="ic">💼</span>비즈니스 · 특허 실무 10문장<span class="sub" style="color:#dbe6ff">익힘 ${learned(S.srs, EXPRESSIONS)}/${EXPRESSIONS.length}${dueBiz ? ' · 복습 ' + dueBiz + '개 대기' : ''} · Lv${S.level}</span></button>
+      <button class="tile block" data-act="daily" style="margin-bottom:10px"><span class="ic">☕</span>일상 회화 10문장<span class="sub">익힘 ${learned(S.csrs, DAILY)}/${DAILY.length}${dueDaily ? ' · 복습 ' + dueDaily + '개 대기' : ''} · 자주 쓰는 순서</span></button>
+      <h2>☕ 일상 회화 주제별 (${DAILY_TOPICS.length}개 주제)</h2>
+      ${DAILY_TOPICS.map((t) => { const list = DAILY.filter((e) => e.topic === t.id); const n = learned(S.csrs, list); return `<button class="list-item" data-act="topic" data-t="${t.id}"><span class="em">${t.e}</span><span class="grow"><b>${esc(t.title)}</b><div class="bar" style="margin-top:6px;height:6px"><i style="width:${(n / list.length) * 100}%"></i></div></span><span class="small muted">${n}/${list.length}</span></button>`; }).join('')}`;
+    const runBiz = () => speakSession(C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now()), '💼 비즈니스 스피킹', runBiz);
+    const runDaily = () => speakSession(C.pickSession(DAILY, S.csrs, 3, 10, Date.now()), '☕ 일상 회화', runDaily);
+    const runTopic = (id) => { const t = DAILY_TOPICS.find((x) => x.id === id); const list = DAILY.filter((e) => e.topic === id); speakSession(C.pickSession(list, S.csrs, 3, 10, Date.now()), t.e + ' ' + t.title, () => runTopic(id)); };
+    bind({ biz: runBiz, daily: runDaily, topic: (el) => runTopic(el.dataset.t) });
+  };
+
+  function speakSession(items, title, again) {
     const results = [];
     let idx = 0, typing = !Speech.srOK, hinted = 0, recHandle = null;
 
@@ -504,7 +550,7 @@
       hinted = 0;
       view.innerHTML = `
         ${progress(idx, items.length)}
-        <div class="row muted small"><span>🎤 스피킹 ${idx + 1}/${items.length}</span><span class="grow"></span><span>${S.srs[e.id] ? '🔁 복습' : '🆕 새 표현'}</span></div>
+        <div class="row muted small"><span>${esc(title)} ${idx + 1}/${items.length}</span><span class="grow"></span><span>${storeOf(e)[e.id] ? '🔁 복습' : '🆕 새 표현'}</span></div>
         ${memeCard(e, { mask: true })}
         <div class="card"><h3>이 말을 영어로?</h3><div class="ko">${esc(e.ko)}</div><div id="hint" class="muted" style="margin-top:8px"></div></div>
         <div id="live" class="live hidden"></div>
@@ -559,7 +605,7 @@
       const r = C.compare(e.en, said);
       let s = r.score;
       if (hinted) s = Math.min(s, 80);
-      S.srs[e.id] = C.srsUpdate(S.srs[e.id], s, Date.now());
+      storeOf(e)[e.id] = C.srsUpdate(storeOf(e)[e.id], s, Date.now());
       const xp = record('speak', s, e.lv);
       results.push(s);
       showResult(e, r, s, said, xp);
@@ -571,7 +617,7 @@
         ${progress(idx + 1, items.length)}
         ${memeCard(e, { imgBtn: false })}
         <div class="card">
-          <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점${s !== r.score ? ' (기록 ' + s + ')' : ''}</span></div><div class="muted small">${esc(msg)} ${retry ? '' : '· +' + xp + ' XP'}</div></div></div>
+          <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점${s !== r.score ? ' (기록 ' + s + ')' : ''}</span></div><div class="muted small">${esc(msg)} ${retry ? '' : '· +' + xp + ' XP'}</div></div>${stampHtml(r.score)}</div>
           <h3 style="margin-top:14px">정답과 비교</h3>
           <div class="diff">${diffHtml(r)}</div>
           <div class="legend"><b style="color:var(--ok)">초록</b> 맞음 · <b style="color:var(--near)">노랑</b> 비슷함 · <b style="color:var(--bad)">빨강</b> 빠짐 ${r.extra ? '· 불필요한 단어 ' + r.extra + '개' : ''}</div>
@@ -610,10 +656,10 @@
         Speech.speak(e.en).then(() => { if (r.score < 85 && g === viewGen && autoMicOn()) retryMic($('#retry'), true); });
       }
     }
-    function summary() { sessionSummary('🎤 스피킹 세션 완료', results, () => go('speak')); }
+    function summary() { sessionSummary(title + ' 완료', results, again, { home: 'speak', homeLabel: '스피킹 메뉴' }); }
     cleanupFns.push(() => { if (recHandle) recHandle.stop(); });
     card();
-  };
+  }
 
   function sessionSummary(title, results, again, opts = {}) {
     const a = Math.round(C.avg(results));
@@ -681,7 +727,7 @@
     const [em] = reaction(r.score);
     view.innerHTML = `
       <div class="card">
-        <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점</span></div><div class="muted small">${r.n}단어${r.wpm ? ' · ' + r.wpm + ' WPM' : ''} · +${xp} XP</div></div></div>
+        <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점</span></div><div class="muted small">${r.n}단어${r.wpm ? ' · ' + r.wpm + ' WPM' : ''} · +${xp} XP</div></div>${stampHtml(r.score)}</div>
         <h3 style="margin-top:14px">피드백</h3><ul class="fb">${r.fb.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
         <h3 style="margin-top:10px">핵심 포인트 (${r.hits.filter(Boolean).length}/${q.kw.length})</h3>
         <div>${q.kw.map((k, i) => `<span class="kw ${r.hits[i] ? 'hit' : 'no'}">${r.hits[i] ? '✓' : '✗'} ${esc(k.split('|')[0])}</span>`).join('')}</div>
@@ -697,6 +743,7 @@
   const AUDIO_MODES = {
     drive: ['🚗', '드라이브 회화', '한국어 → 내가 영어로 말하기 → 채점 → 정답. 마이크 사용.'],
     shadow: ['🗣️', '쉐도잉', '한국어 → 3초 생각 → 영어 2회(느리게). 마이크 없이 따라 말하기.'],
+    daily: ['☕', '일상 회화 드라이브', '한국어 → 내가 영어로 말하기 → 채점 → 정답. 일상 회화 1000문장.'],
     fr: ['🇫🇷', '프랑스어 따라 말하기', '한국어 → 프랑스어 2회(느리게). 소리 내어 따라 하기.'],
     iv: ['💼', '면접 실전', '면접 질문 → 25초 동안 소리 내어 답변 → 모범답안 → 따라 말하기.'],
   };
@@ -707,7 +754,7 @@
         <div class="card"><p class="small">⚠️ <b>운전 중에는 화면을 보지 마세요.</b> 시작 전에 거치대에 두고 시작 버튼만 누르면 끝까지 자동 진행돼요.</p>
         <p class="muted small">iOS는 화면이 잠기면 음성이 멈춰요. 진행 중 화면 꺼짐을 자동으로 막습니다(iOS 16.4+). 안 되면 설정 > 디스플레이 > 자동 잠금 시간을 늘려주세요.</p></div>
         ${Object.entries(AUDIO_MODES).map(([k, [e, n, d]]) => `<button class="list-item" data-act="mode" data-k="${k}" style="${mode === k ? 'outline:2px solid var(--acc)' : ''}"><span class="em">${e}</span><span class="grow"><b>${n}</b><br><span class="muted small">${d}</span></span>${mode === k ? '✓' : ''}</button>`).join('')}
-        ${mode === 'drive' && !Speech.srOK ? '<p class="small" style="color:var(--near)">이 기기는 음성인식이 안 돼서 쉐도잉으로 진행됩니다.</p>' : ''}
+        ${(mode === 'drive' || mode === 'daily') && !Speech.srOK ? '<p class="small" style="color:var(--near)">이 기기는 음성인식이 안 돼서 쉐도잉으로 진행됩니다.</p>' : ''}
         <label>문장 수</label>
         <div class="chips">${[10, 20, 30, 0].map((n) => `<button data-act="cnt" data-n="${n}" class="${count === n ? 'on' : ''}">${n || '무한 반복'}</button>`).join('')}</div>
         <button class="primary block huge" data-act="start">▶︎ 시작</button>`;
@@ -722,6 +769,8 @@
 
   function runAudio(mode, count) {
     let alive = true, paused = false, skip = false, done = 0, srStreakFail = 0;
+    const daily = mode === 'daily';
+    if (daily) mode = 'drive';
     if (mode === 'drive' && !Speech.srOK) mode = 'shadow';
     keepAwake(true);
     const onVis = () => { if (document.visibilityState === 'visible' && alive) keepAwake(true); };
@@ -737,7 +786,7 @@
       </div>
       <div class="grid2"><button class="big" data-act="pause" id="pz">⏸ 일시정지</button><button class="big" data-act="skip">⏭ 다음</button></div>
       <button class="danger block huge" style="margin-top:12px" data-act="stop">⏹ 종료</button>`;
-    const set = (ph, em, mn, sb) => { if (!alive) return; $('#ph').textContent = ph; if (em != null) $('#em').textContent = em; $('#mn').textContent = mn || ''; $('#sb').textContent = sb || ''; $('#ct').textContent = (done + 1) + (count ? ' / ' + count : '') + ' · ' + AUDIO_MODES[mode][1]; };
+    const set = (ph, em, mn, sb) => { if (!alive) return; $('#ph').textContent = ph; if (em != null) $('#em').textContent = em; $('#mn').textContent = mn || ''; $('#sb').textContent = sb || ''; $('#ct').textContent = (done + 1) + (count ? ' / ' + count : '') + ' · ' + (daily ? '일상 회화 · ' : '') + AUDIO_MODES[mode][1]; };
     bind({
       stop: () => { alive = false; Speech.stop(); finish(); },
       skip: () => { skip = true; Speech.stop(); },
@@ -751,7 +800,7 @@
       let queue = [];
       while (alive && (!count || done < count)) {
         if (!queue.length) {
-          queue = mode === 'fr' ? shuffle(frPool()) : mode === 'iv' ? shuffle(INTERVIEW) : C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now());
+          queue = mode === 'fr' ? shuffle(frPool()) : mode === 'iv' ? shuffle(INTERVIEW) : (daily ? C.pickSession(DAILY, S.csrs, 3, 10, Date.now()) : C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now()));
           if (mode !== 'iv' && mode !== 'fr') queue = shuffle(queue);
         }
         const e = queue.shift();
@@ -786,7 +835,7 @@
               if (alive && !skip) {
                 if (said) {
                   const r = C.compare(e.en, said);
-                  S.srs[e.id] = C.srsUpdate(S.srs[e.id], r.score, Date.now()); record('speak', r.score, e.lv);
+                  storeOf(e)[e.id] = C.srsUpdate(storeOf(e)[e.id], r.score, Date.now()); record('speak', r.score, e.lv);
                   const [em, msg] = reaction(r.score);
                   set('SCORE ' + r.score, em, e.en, msg);
                   await say(r.score >= 85 ? 'Great!' : r.score >= 60 ? 'Almost. Listen.' : 'Here is the answer.');
@@ -984,7 +1033,7 @@
       const [em, msg] = r.score === 100 ? ['😎', 'Parfait ! 완벽해요'] : r.score >= 85 ? ['🥐', 'Très bien ! 아주 좋아요'] : r.score >= 70 ? ['👍', 'Bien ! 거의 다 왔어요'] : r.score >= 50 ? ['🤏', 'Presque… 한 번 더!'] : ['🫣', 'Courage ! 천천히 다시 들어봐요'];
       view.innerHTML = `${progress(idx + 1, items.length)}
         <div class="card">
-          <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점</span></div><div class="muted small">${esc(msg)}${retry ? '' : ' · +' + xp + ' XP'}</div>${s !== r.score ? `<div class="muted small">${mode === 'learn' ? '보고 따라 말하기는 최대 80점 기록 → 퀴즈에서 100점 도전!' : '힌트 사용 → ' + s + '점 기록'}</div>` : ''}</div></div>
+          <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점</span></div><div class="muted small">${esc(msg)}${retry ? '' : ' · +' + xp + ' XP'}</div>${s !== r.score ? `<div class="muted small">${mode === 'learn' ? '보고 따라 말하기는 최대 80점 기록 → 퀴즈에서 100점 도전!' : '힌트 사용 → ' + s + '점 기록'}</div>` : ''}</div>${stampHtml(r.score)}</div>
           <h3 style="margin-top:14px">정답과 비교</h3><div class="diff">${r.words.map((x) => `<span class="${x.st}">${esc(x.w)}</span>`).join(' ')}</div>
           <div style="color:var(--acc);margin-top:4px">[${esc(it.pr)}] · ${esc(it.ko)}</div>
           <h3 style="margin-top:12px">내 답 (인식 결과)</h3><div class="muted">${esc(said)}</div>

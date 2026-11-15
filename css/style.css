@@ -116,3 +116,75 @@ ul.fb { padding-left: 18px; line-height: 1.6; margin: 6px 0; }
 .confetti { position: fixed; top: -40px; font-size: 26px; z-index: 100; pointer-events: none; animation: fall linear forwards; }
 @keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
 .hidden { display: none !important; }
+
+/* ═════════ 테마: 🇬🇧 + 🇫🇷 · 특허 사무소 ═════════ */
+:root {
+  --bg: #071330; --card: #0f2250; --card2: #1a3266; --line: #2a4580;
+  --text: #f4f6fb; --muted: #a3b3d4; --acc: #8db9ff;
+  --navy: #012169; --uk-red: #C8102E; --fr-blue: #0055A4; --fr-red: #EF4135;
+  --ivory: #faf6ea; --ink: #0b1b3f; --ink2: #56607c;
+  --serif: Georgia, "Times New Roman", "Apple SD Gothic Neo", serif;
+}
+html, body { background: var(--bg); }
+body { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.018) 0 2px, transparent 2px 26px), repeating-linear-gradient(-45deg, rgba(255,255,255,.018) 0 2px, transparent 2px 26px); }
+#view { padding-top: 6px; }
+h1 { font-family: var(--serif); letter-spacing: .3px; }
+h2 { font-family: var(--serif); font-size: 17px; padding-left: 10px; border-left: 4px solid var(--uk-red); }
+.card { border: 1px solid rgba(255,255,255,.06); border-radius: 12px; }
+button, .btn { border-radius: 10px; }
+.primary { background: var(--fr-blue); color: #fff; box-shadow: inset 0 -4px 0 var(--uk-red); }
+.tile.primary .sub { color: #dbe6ff !important; }
+.tile { border-left: 4px solid var(--fr-blue); }
+.tile.primary { border-left-color: #fff; }
+.huge { border-radius: 16px; }
+.danger { background: var(--uk-red); }
+.pill { border-radius: 4px; letter-spacing: .3px; }
+.bar > i, .prog > i { background: linear-gradient(90deg, var(--fr-blue), #ffffff, var(--uk-red)); }
+.chips button.on { background: #fff; color: var(--navy); box-shadow: inset 0 -3px 0 var(--uk-red); }
+.tipbox { border-left-color: var(--fr-blue); background: rgba(0,85,164,.15); }
+.live { border-color: var(--line); color: var(--acc); }
+.meme { border: 3px double rgba(255,255,255,.55); border-radius: 10px; }
+.list-item { border-radius: 10px; border-left: 3px solid transparent; }
+.list-item:active { border-left-color: var(--uk-red); }
+#tabs { background: #050f27; border-top: 1px solid #1c2f5c; }
+#tabs button.on { color: #fff; box-shadow: inset 0 3px 0 var(--uk-red); }
+.stat { border-top: 3px solid var(--fr-blue); border-radius: 8px; }
+.stat:nth-child(2) { border-top-color: #fff; }
+.stat:nth-child(3) { border-top-color: var(--uk-red); }
+.badge { border-radius: 8px; }
+
+/* 상단 브랜드: 영국 + 프랑스 국기를 이어 붙인 엠블럼 */
+#brand { display: flex; align-items: center; gap: 10px; padding: calc(var(--safe-t) + 10px) 16px 6px; max-width: 560px; margin: 0 auto; }
+#brand .flag { width: 64px; height: 18px; flex: none; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.35), 0 2px 6px rgba(0,0,0,.4); }
+#brand .t { font-family: var(--serif); font-weight: 700; font-size: 17px; letter-spacing: .5px; line-height: 1.1; }
+#gear { min-height: 38px; padding: 6px 10px; background: transparent; border: 1px solid var(--line); }
+#brand .s { font-size: 9.5px; color: var(--muted); letter-spacing: 1.8px; text-transform: uppercase; }
+
+/* 홈: 특허증 스타일 점수판 */
+.cert { position: relative; background: var(--ivory); color: var(--ink); border-radius: 6px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 10px 28px rgba(0,0,0,.4); }
+.cert .ribbon { display: flex; height: 14px; }
+.cert .ribbon .uk { flex: 1; background: linear-gradient(to bottom, var(--navy) 0 22%, #fff 22% 36%, var(--uk-red) 36% 64%, #fff 64% 78%, var(--navy) 78%); }
+.cert .ribbon .fr { flex: 1; background: linear-gradient(90deg, var(--fr-blue) 0 33.3%, #fff 33.3% 66.6%, var(--fr-red) 66.6%); }
+.cert .frame { margin: 8px; padding: 14px 16px 16px; border: 2px solid var(--ink); outline: 1px solid var(--ink); outline-offset: 3px;
+  background-image: repeating-radial-gradient(circle at 50% 120%, rgba(1,33,105,.035) 0 1px, transparent 1px 7px); }
+.cert .head { text-align: center; font-family: var(--serif); font-weight: 700; font-size: 13px; letter-spacing: 2.5px; }
+.cert .head span { display: block; font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; letter-spacing: 0; font-size: 12px; font-weight: 600; color: var(--ink2); margin-top: 2px; }
+.cert .no { text-align: center; font-family: "Courier New", monospace; font-size: 11px; color: var(--ink2); margin: 6px 0 8px; }
+.cert .score { font-family: var(--serif); font-size: 58px; font-weight: 700; color: var(--navy); line-height: 1; }
+.cert .muted, .cert .small { color: var(--ink2); }
+.cert .bar { background: rgba(1,33,105,.12); }
+.cert .kv { font-size: 13px; margin-top: 6px; }
+.cert .kv b { color: var(--navy); }
+.cert .gear { position: absolute; top: 26px; right: 16px; min-height: 34px; padding: 4px 9px; background: transparent; border: 1px solid rgba(11,27,63,.3); color: var(--ink); }
+.seal { position: absolute; right: 22px; top: 122px; width: 86px; height: 86px; border-radius: 50%; color: rgba(200,16,46,.86); border: 3px solid currentColor;
+  box-shadow: inset 0 0 0 3px var(--ivory), inset 0 0 0 4.5px rgba(200,16,46,.86); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: var(--serif); font-size: 8.5px; font-weight: 700; letter-spacing: 1.2px; transform: rotate(-14deg); text-align: center; line-height: 1.25; pointer-events: none; }
+.seal b { font-size: 22px; line-height: 1.1; letter-spacing: 0; }
+
+/* 채점 도장 */
+.stamp { margin-left: auto; flex: none; border: 3px solid currentColor; border-radius: 6px; padding: 5px 8px; font-family: var(--serif); font-weight: 900; font-size: 17px;
+  transform: rotate(-11deg); text-align: center; line-height: 1.15; opacity: .93; }
+.stamp small { display: block; font-size: 8.5px; letter-spacing: 2px; font-weight: 700; }
+.stamp.granted { color: #ff5468; border-style: double; border-width: 5px; border-radius: 50%; width: 82px; height: 82px; display: flex; flex-direction: column; justify-content: center; padding: 0; }
+.stamp.amend { color: #8db9ff; }
+.stamp.rejected { color: #b9c2d6; text-decoration: none; }

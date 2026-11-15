@@ -98,13 +98,26 @@ t('french normalize & data', () => {
   }
   assert.ok(ids.size >= 60);
 });
+t('daily 1000: unique, self-match 100, original text shown', () => {
+  const T = require('../js/daily-data.js').DAILY_TOPICS;
+  const seen = new Set(); let n = 0;
+  for (const tp of T) for (const [en, ko] of tp.items) {
+    n++; const k = C.normalize(en).join(' ');
+    assert.ok(!seen.has(k), 'dup ' + en); seen.add(k);
+    assert.ok(ko, en);
+    const r = C.compare(en, en);
+    assert.strictEqual(r.score, 100, en);
+    assert.strictEqual(r.words.map((x) => x.w).join(' '), en.trim());
+  }
+  assert.strictEqual(n, 1000);
+});
 console.log('OK', pass, 'test groups passed');
 // 음성 파일: 앱과 동일한 해시 규칙으로 모든 문장의 파일이 존재하는지
 {
   const fs = require('fs'), path = require('path');
   const fnv = (str) => { let h = 0x811c9dc5; for (const b of Buffer.from(str, 'utf8')) { h ^= b; h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
   const D = require('../js/data.js'), F = require('../js/fr-data.js');
-  const need = [...D.EXPRESSIONS.map((e) => ['en', e.en]), ...D.INTERVIEW.flatMap((q) => [['en', q.q], ['en', q.a]]), ...F.FR_UNITS.flatMap((u) => u.items.map((i) => ['fr', i.fr]))];
+  const need = [...D.EXPRESSIONS.map((e) => ['en', e.en]), ...D.INTERVIEW.flatMap((q) => [['en', q.q], ['en', q.a]]), ...F.FR_UNITS.flatMap((u) => u.items.map((i) => ['fr', i.fr])), ...require('../js/daily-data.js').DAILY_TOPICS.flatMap((t) => t.items.map(([e]) => ['en', e]))];
   const miss = need.filter(([l, t]) => !fs.existsSync(path.join(__dirname, '..', 'audio', l, fnv(l + '|' + t) + '.mp3')));
   assert.deepStrictEqual(miss, [], 'missing audio');
   console.log('OK audio files for', need.length, 'sentences');

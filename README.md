@@ -33,6 +33,7 @@
 ```
 index.html, css/style.css
 js/data.js   영어 표현 291개 · 면접 12문항 (내용 수정은 여기서)
+js/daily-data.js 영어 일상 회화 1000문장 (40개 주제)
 js/fr-data.js 프랑스어 18단원 222개
 js/core.js   채점·간격반복·레벨·보상 로직
 js/app.js    화면
