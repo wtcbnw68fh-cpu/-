@@ -1,6 +1,6 @@
 /* 오프라인 캐시: 앱 파일을 저장해 지하철 등 오프라인에서도 실행.
  * 파일 수정 후 배포할 때 VERSION 숫자를 올리면 새 버전으로 교체됨. */
-const VERSION = 'biztalk-v6';
+const VERSION = 'biztalk-v7';
 const AUDIO_CACHE = 'biztalk-audio-v1'; // 음성 파일은 이름이 내용 해시라 버전과 무관하게 유지
 const FILES = ['./', 'index.html', 'css/style.css', 'js/data.js', 'js/fr-data.js', 'js/audio-manifest.js', 'audio/silence.mp3', 'js/core.js', 'js/app.js',
   'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];

@@ -1,7 +1,7 @@
 /* BizTalk — 변리사 비즈니스 영어 PWA */
 (function () {
   'use strict';
-  const { CATS, EXPRESSIONS, DICTATION_EXTRA, INTERVIEW } = window.APP_DATA;
+  const { CATS, EXPRESSIONS, INTERVIEW } = window.APP_DATA;
   const { FR_UNITS } = window.FR_DATA;
   const FR_ITEMS = FR_UNITS.flatMap((u) => u.items.map((it) => Object.assign({ unit: u.id }, it)));
   const C = window.CORE;
@@ -9,12 +9,11 @@
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const view = $('#view');
-  const ALL_DICT = EXPRESSIONS.concat(DICTATION_EXTRA);
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
-  const APP_VERSION = '1.5 (11/15) · AI 음성';
+  const APP_VERSION = '1.6 (11/15) · 스피킹 집중';
   const KEY = 'bizeng.v1';
   const DEF = {
     v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, dsrs: {}, iv: {}, badges: {},
@@ -265,6 +264,9 @@
   const listenHint = () => (S.settings.endMode === 'manual' ? '듣는 중… 말을 마치면 ⏹ 버튼을 누르세요' : '듣는 중… 말씀하세요 (끝나면 잠시 멈추면 자동 종료)');
   const wc = (t) => String(t).trim().split(/\s+/).length;
 
+  let viewGen = 0; // 화면이 바뀌었는지 확인용 (자동 마이크가 엉뚱한 화면에서 켜지지 않게)
+  const autoMicOn = () => S.settings.autoMic !== false && Speech.srOK;
+
   function srErrorMsg(code) {
     if (code === 'not-allowed' || code === 'service-not-allowed')
       return '마이크/음성인식 권한이 없어요. 설정 > 앱(Safari) > 마이크 허용, 설정 > 일반 > 키보드 > 받아쓰기 켜기를 확인하세요. 지금은 입력 모드로 진행합니다.';
@@ -307,7 +309,7 @@
     return {
       attempts: a.length, bestStreak: S.bestStreak, perfect: a.filter((x) => x.s === 100).length,
       learned: Object.keys(S.srs).filter((id) => S.srs[id].best >= 70).length, totalExpr: EXPRESSIONS.length,
-      dict: a.filter((x) => x.m === 'dict').length, iv: a.filter((x) => x.m === 'iv').length, audio: S.audio, maxLv: S.maxLv,
+      speak: a.filter((x) => x.m === 'speak').length, iv: a.filter((x) => x.m === 'iv').length, audio: S.audio, maxLv: S.maxLv,
       frAtt: S.fr.att.length, frLearned: Object.values(S.fr.srs).filter((x) => x.best >= 70).length,
     };
   }
@@ -384,6 +386,7 @@
   /* ═════════ 라우터 ═════════ */
   let cleanupFns = [];
   function go(tab, arg) {
+    viewGen++;
     Speech.stop(); keepAwake(false);
     cleanupFns.forEach((f) => { try { f(); } catch (e) { /* noop */ } }); cleanupFns = [];
     $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
@@ -445,7 +448,8 @@
     const stk = C.streak(S.daily, goal, now);
     const due = EXPRESSIONS.filter((e) => e.lv <= S.level && S.srs[e.id] && S.srs[e.id].due <= now).length;
     const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
-    const sp = avgOf('speak'), dc = avgOf('dict'), iv = avgOf('iv');
+    const sp = avgOf('speak'), iv = avgOf('iv');
+    const frRec = S.fr.att.slice(-20), frAcc = frRec.length ? Math.round(C.avg(frRec.map((a) => a.s))) : null;
 
     view.innerHTML = `
       ${!standalone ? `<div class="card" style="border:1px dashed var(--acc)"><b>📲 홈 화면에 추가하세요</b><p class="muted small">Safari 하단 공유 버튼 <b>⬆︎</b> → <b>홈 화면에 추가</b>. 앱처럼 바로 실행되고 오프라인(지하철)에서도 동작해요.</p></div>` : ''}
@@ -461,7 +465,7 @@
       </div>
       <div class="grid2">
         <button class="tile primary" data-act="speak"><span class="ic">🎤</span>스피킹 10문장<span class="sub" style="color:#e0e7ff">${due ? '복습 ' + due + '개 대기 중' : '새 표현 + 복습'}</span></button>
-        <button class="tile" data-act="dict"><span class="ic">🎧</span>딕테이션<span class="sub">듣고 받아쓰기</span></button>
+        <button class="tile" data-act="fr"><span class="ic">🇫🇷</span>프랑스어<span class="sub">왕초보 말하기</span></button>
         <button class="tile" data-act="audio"><span class="ic">🚗</span>운전/지하철 모드<span class="sub">핸즈프리 반복</span></button>
         <button class="tile" data-act="iv"><span class="ic">💼</span>영어 면접<span class="sub">답변 피드백</span></button>
       </div>
@@ -469,7 +473,7 @@
       <div class="card">${chartSvg()}</div>
       <div class="grid3">
         <div class="stat"><b>${sp ?? '–'}</b><span>스피킹 정확도</span></div>
-        <div class="stat"><b>${dc ?? '–'}</b><span>리스닝 정확도</span></div>
+        <div class="stat"><b>${frAcc ?? '–'}</b><span>프랑스어 정확도</span></div>
         <div class="stat"><b>${iv ?? '–'}</b><span>면접 점수</span></div>
       </div>
       <p class="muted small">최근 20회 평균. Score = 레벨 기본점(0/300/600) + 최근 30회 평균×4</p>
@@ -481,7 +485,7 @@
       <button class="list-item" data-act="settings"><span class="em">⚙️</span><span class="grow">설정 · 음성 · 백업</span>›</button>
     `;
     bind({
-      speak: () => go('speak'), dict: () => go('dict'), audio: () => go('audio'), iv: () => go('iv'),
+      speak: () => go('speak'), fr: () => go('fr'), audio: () => go('audio'), iv: () => go('iv'),
       lib: () => go('lib'), test: () => go('test'), settings: () => go('settings'),
       skipOnb: () => { S.onboarded = true; save(); go('home'); },
     });
@@ -495,6 +499,7 @@
     let idx = 0, typing = !Speech.srOK, hinted = 0, recHandle = null;
 
     function card() {
+      viewGen++;
       const e = items[idx];
       hinted = 0;
       view.innerHTML = `
@@ -512,10 +517,11 @@
         </div>
         <p class="muted small">힌트/정답을 보면 최대 80점으로 기록돼요.</p>`;
       bind({
-        mic: startMic, hint: showHint, reveal: () => { hinted = 2; showAnswerThen(); },
+        mic: (b) => startMic(b), hint: showHint, reveal: () => { hinted = 2; showAnswerThen(); },
         toggleType: () => { typing = !typing; card(); },
         submitTyped: () => { const v = $('#typed').value.trim(); if (!v) return toast('입력해 주세요'); evaluate(v); },
       });
+      if (autoMicOn() && !typing) startMic($('#mic'), true); // 카드가 뜨면 바로 듣기 시작
     }
     function showHint() {
       const e = items[idx], w = e.en.split(' ');
@@ -525,14 +531,16 @@
     async function showAnswerThen() {
       const e = items[idx];
       $('#hint').innerHTML = '👀 <b style="color:var(--text)">' + esc(e.en) + '</b><br><span class="small">듣고 따라 말해보세요.</span>';
+      const g = viewGen;
       await Speech.speak(e.en);
+      if (g === viewGen && !typing && !recHandle && $('#mic')) startMic($('#mic'), true); // 듣고 나면 바로 따라 말하기
     }
-    async function startMic(btn) {
+    async function startMic(btn, auto) {
       if (recHandle) { recHandle.stop(); return; }
       Speech.stop();
       const live = $('#live'); live.classList.remove('hidden'); live.textContent = listenHint();
       btn.classList.add('mic-on'); btn.textContent = '⏹ 말하기 끝내기';
-      recHandle = Speech.listen(endOpts({ expectWords: wc(items[idx].en), onInterim: (s) => (live.textContent = s) }));
+      recHandle = Speech.listen(endOpts({ expectWords: wc(items[idx].en), noSpeechMs: auto ? 12000 : 8000, onInterim: (s) => (live.textContent = s) }));
       try {
         const said = await recHandle.promise;
         recHandle = null;
@@ -540,6 +548,7 @@
         evaluate(said);
       } catch (code) {
         recHandle = null;
+        if (auto) { btn.classList.remove('mic-on'); btn.textContent = '🎤 탭하고 말하기'; live.classList.add('hidden'); return; } // 자동 시작 실패는 조용히
         toast(srErrorMsg(code), 5000);
         if (code === 'not-allowed' || code === 'service-not-allowed' || code === 'unsupported' || Speech.srFails >= 2) { typing = true; }
         card();
@@ -556,6 +565,7 @@
       showResult(e, r, s, said, xp);
     }
     function showResult(e, r, s, said, xp, retry) {
+      viewGen++;
       const [em, msg] = reaction(r.score);
       view.innerHTML = `
         ${progress(idx + 1, items.length)}
@@ -569,22 +579,36 @@
           <h3 style="margin-top:12px">정답</h3><div class="en">${esc(e.en)}</div><div class="muted">${esc(e.ko)}</div>
           ${e.tip ? `<div class="tipbox">📝 ${esc(e.tip)}</div>` : ''}
         </div>
-        <div class="grid2"><button data-act="listen">🔊 정답 듣기</button><button data-act="retry">🔁 다시 말하기</button></div>
-        <button class="primary block big" style="margin-top:10px" data-act="next">${idx + 1 < items.length ? '다음 →' : '결과 보기'}</button>
-        <p class="muted small">다시 말하기는 연습용(기록에 반영 안 됨)이에요.</p>`;
+        <div id="live" class="live hidden"></div>
+        ${r.score < 85
+          ? `<button class="primary block huge" data-act="retry" id="retry">🔁 다시 말하기</button>
+             <div class="grid2" style="margin-top:10px"><button data-act="listen">🔊 정답 듣기</button><button data-act="next">${idx + 1 < items.length ? '다음 →' : '결과 보기'}</button></div>`
+          : `<div class="grid2"><button data-act="listen">🔊 정답 듣기</button><button data-act="retry" id="retry">🔁 다시 말하기</button></div>
+             <button class="primary block big" style="margin-top:10px" data-act="next">${idx + 1 < items.length ? '다음 →' : '결과 보기'}</button>`}
+        <p class="muted small">${r.score < 85 ? '정답을 듣고 나면 마이크가 자동으로 켜져요. 따라 말해보세요! (연습용, 기록 반영 안 됨)' : '다시 말하기는 연습용(기록에 반영 안 됨)이에요.'}</p>`;
       bind({
         listen: () => Speech.speak(e.en),
-        retry: async (btn) => {
-          if (!Speech.srOK || typing) {
-            const v = prompt('영어로 입력하세요'); if (v) showResult(e, C.compare(e.en, v), s, v, 0, true); return;
-          }
-          btn.classList.add('mic-on'); btn.textContent = '듣는 중…';
-          try { const v = await Speech.listen(endOpts({ expectWords: wc(e.en) })).promise; if (v) showResult(e, C.compare(e.en, v), s, v, 0, true); else { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시 말하기'; toast('음성이 들리지 않았어요'); } }
-          catch (c) { toast(srErrorMsg(c), 4000); btn.classList.remove('mic-on'); btn.textContent = '🔁 다시 말하기'; }
-        },
+        retry: (btn) => retryMic(btn, false),
         next: () => { idx++; if (idx < items.length) card(); else summary(); },
       });
-      if (r.score < 100) Speech.speak(e.en);
+      async function retryMic(btn, auto) {
+        if (recHandle) { recHandle.stop(); return; }
+        if (!Speech.srOK || typing) {
+          if (auto) return;
+          const v = prompt('영어로 입력하세요'); if (v) showResult(e, C.compare(e.en, v), s, v, 0, true); return;
+        }
+        Speech.stop();
+        const live = $('#live'); live.classList.remove('hidden'); live.textContent = auto ? '🗣️ 따라 말해보세요…' : listenHint();
+        btn.classList.add('mic-on'); btn.textContent = '⏹ 말하기 끝내기';
+        const reset = () => { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시 말하기'; };
+        recHandle = Speech.listen(endOpts({ expectWords: wc(e.en), onInterim: (t) => (live.textContent = t) }));
+        try { const v = await recHandle.promise; recHandle = null; if (v) showResult(e, C.compare(e.en, v), s, v, 0, true); else { reset(); live.textContent = '음성이 들리지 않았어요. 버튼을 눌러 다시 말해보세요.'; } }
+        catch (c) { recHandle = null; reset(); live.classList.add('hidden'); if (!auto) toast(srErrorMsg(c), 4000); }
+      }
+      if (r.score < 100) {
+        const g = viewGen;
+        Speech.speak(e.en).then(() => { if (r.score < 85 && g === viewGen && autoMicOn()) retryMic($('#retry'), true); });
+      }
     }
     function summary() { sessionSummary('🎤 스피킹 세션 완료', results, () => go('speak')); }
     cleanupFns.push(() => { if (recHandle) recHandle.stop(); });
@@ -602,57 +626,6 @@
       <div class="grid2"><button class="primary big" data-act="again">한 세트 더</button><button class="big" data-act="home">${opts.homeLabel || '홈으로'}</button></div>`;
     bind({ again, home: () => go(opts.home || 'home'), lvdown: () => { S.level = Math.max(1, S.level - 1); save(); toast('Level ' + S.level + '로 조정했어요'); go('home'); } });
   }
-
-  /* ═════════ 딕테이션 ═════════ */
-  ROUTES.dict = function () {
-    const items = C.pickSession(ALL_DICT, S.dsrs, S.level, 10, Date.now());
-    const results = [];
-    let idx = 0;
-    function card() {
-      const e = items[idx];
-      view.innerHTML = `
-        ${progress(idx, items.length)}
-        <div class="row muted small"><span>🎧 딕테이션 ${idx + 1}/${items.length}</span><span class="grow"></span><span class="pill">Lv${e.lv}</span></div>
-        <div class="card" style="text-align:center">
-          <div style="font-size:56px">🎧</div>
-          <div class="grid2" style="margin-top:10px"><button class="primary big" data-act="play">▶︎ 듣기</button><button class="big" data-act="slow">🐢 느리게</button></div>
-          <button class="ghost block" style="margin-top:10px" data-act="meaning">뜻 보기</button>
-          <div id="meaning" class="muted hidden" style="margin-top:8px">${esc(e.ko)}</div>
-        </div>
-        <textarea id="ans" autocapitalize="sentences" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="들은 문장을 입력하세요"></textarea>
-        <button class="primary block big" style="margin-top:10px" data-act="check">채점</button>
-        <p class="muted small">대소문자·문장부호는 채점에 영향 없음. 축약형(I'll ↔ I will)은 같은 답으로 인정.</p>`;
-      bind({
-        play: () => Speech.speak(e.en), slow: () => Speech.speak(e.en, { rate: 0.7 }),
-        meaning: () => $('#meaning').classList.toggle('hidden'),
-        check: () => {
-          const v = $('#ans').value.trim(); if (!v) return toast('입력해 주세요');
-          const r = C.compare(e.en, v);
-          S.dsrs[e.id] = C.srsUpdate(S.dsrs[e.id], r.score, Date.now());
-          const xp = record('dict', r.score, e.lv); results.push(r.score);
-          const [em, msg] = reaction(r.score);
-          view.innerHTML = `
-            ${progress(idx + 1, items.length)}
-            <div class="card">
-              <div class="result-head"><div class="react">${em}</div><div><div class="num">${r.score}<span class="muted small">점</span></div><div class="muted small">${esc(msg)} · +${xp} XP</div></div></div>
-              <h3 style="margin-top:14px">채점</h3><div class="diff">${diffHtml(r)}</div>
-              <div class="legend"><b style="color:var(--ok)">초록</b> 맞음 · <b style="color:var(--near)">노랑</b> 철자 근접 · <b style="color:var(--bad)">빨강</b> 놓침</div>
-              <h3 style="margin-top:12px">정답</h3><div class="en">${esc(e.en)}</div><div class="muted">${esc(e.ko)}</div>
-              <h3 style="margin-top:12px">내 답</h3><div class="muted">${esc(v)}</div>
-            </div>
-            <div class="grid2"><button data-act="play">🔊 다시 듣기</button><button data-act="slow">🐢 느리게</button></div>
-            <button class="primary block big" style="margin-top:10px" data-act="next">${idx + 1 < items.length ? '다음 →' : '결과 보기'}</button>`;
-          bind({
-            play: () => Speech.speak(e.en), slow: () => Speech.speak(e.en, { rate: 0.7 }),
-            next: () => { idx++; if (idx < items.length) card(); else sessionSummary('🎧 딕테이션 완료', results, () => go('dict')); },
-          });
-        },
-      });
-      Speech.speak(e.en);
-    }
-    view.innerHTML = `<h1>🎧 딕테이션</h1><div class="card"><p>문장을 듣고 그대로 받아 적어요. 자주 쓰는 표현부터, 틀린 문장은 다시 출제됩니다.</p><p class="muted small">🔇 무음 모드에서는 소리가 안 날 수 있어요. 측면 스위치를 확인하세요.</p></div><button class="primary block huge" data-act="start">▶︎ 시작 (10문장)</button>`;
-    bind({ start: card });
-  };
 
   /* ═════════ 면접 ═════════ */
   ROUTES.iv = function () {
@@ -724,12 +697,11 @@
   const AUDIO_MODES = {
     drive: ['🚗', '드라이브 회화', '한국어 → 내가 영어로 말하기 → 채점 → 정답. 마이크 사용.'],
     shadow: ['🗣️', '쉐도잉', '한국어 → 3초 생각 → 영어 2회(느리게). 마이크 없이 따라 말하기.'],
-    listen: ['🚇', '리스닝 루프', '영어만 2회 반복 + 화면에 뜻. 지하철용.'],
-    iv: ['💼', '면접 리스닝', '면접 질문 → 모범답안. 이동 중 답변 흡수.'],
-    fr: ['🇫🇷', '프랑스어 따라 말하기', '한국어 → 프랑스어 2회(느리게). 지금 배우는 단원까지.'],
+    fr: ['🇫🇷', '프랑스어 따라 말하기', '한국어 → 프랑스어 2회(느리게). 소리 내어 따라 하기.'],
+    iv: ['💼', '면접 실전', '면접 질문 → 25초 동안 소리 내어 답변 → 모범답안 → 따라 말하기.'],
   };
   ROUTES.audio = function () {
-    let mode = S.settings.audioMode || 'shadow', count = S.settings.audioCount || 10;
+    let mode = AUDIO_MODES[S.settings.audioMode] ? S.settings.audioMode : 'drive', count = S.settings.audioCount || 10;
     function render() {
       view.innerHTML = `<h1>🚗 오디오 모드</h1>
         <div class="card"><p class="small">⚠️ <b>운전 중에는 화면을 보지 마세요.</b> 시작 전에 거치대에 두고 시작 버튼만 누르면 끝까지 자동 진행돼요.</p>
@@ -779,7 +751,7 @@
       let queue = [];
       while (alive && (!count || done < count)) {
         if (!queue.length) {
-          queue = mode === 'fr' ? shuffle(frPool()) : mode === 'iv' ? shuffle(INTERVIEW) : C.pickSession(mode === 'listen' ? ALL_DICT : EXPRESSIONS, mode === 'listen' ? S.dsrs : S.srs, S.level, 10, Date.now());
+          queue = mode === 'fr' ? shuffle(frPool()) : mode === 'iv' ? shuffle(INTERVIEW) : C.pickSession(EXPRESSIONS, S.srs, S.level, 10, Date.now());
           if (mode !== 'iv' && mode !== 'fr') queue = shuffle(queue);
         }
         const e = queue.shift();
@@ -790,10 +762,12 @@
             set('FRANÇAIS', null, e.fr, '[' + e.pr + '] ' + e.ko); await say(e.fr, { lang: 'fr-FR' }); await wait(2000);
             set('RÉPÉTEZ', null, e.fr, '따라 말하세요 [' + e.pr + ']'); await say(e.fr, { lang: 'fr-FR', rate: 0.75 }); await wait(Math.max(2500, e.fr.length * 90));
           } else if (mode === 'iv') {
-            set('QUESTION', '💼', e.q, e.ko); await say(e.q); await wait(4000);
-            set('MODEL ANSWER', '⭐', e.q, e.a); await say(e.a); await wait(2000);
-          } else if (mode === 'listen') {
-            set('LISTEN', '🎧', e.en, e.ko); await say(e.en); await wait(1500); await say(e.en, { rate: 0.85 }); await wait(2000);
+            set('QUESTION', '💼', e.q, e.ko); await say(e.q);
+            if (await gate()) { await Speech.beep(); }
+            for (let t = 25; t > 0 && alive && !skip; t--) { set('🗣️ 답변하세요 ' + t + '초', '🎤', e.q, '소리 내어 영어로 답변해 보세요'); await wait(1000); }
+            set('MODEL ANSWER', '⭐', e.q, e.a); await say(e.a); await wait(1500);
+            const first = e.a.split(/(?<=[.!?])\s+/)[0];
+            set('REPEAT', '🗣️', first, '첫 문장을 따라 말하세요'); await say(first, { rate: 0.9 }); await wait(Math.max(3000, first.length * 75));
           } else if (mode === 'shadow') {
             set('한국어', e.m ? e.m[0] : '🗣️', e.ko, '영어로 떠올려 보세요'); if (S.settings.koPrompt) await say(e.ko, { lang: 'ko-KR' }); await wait(3500);
             set('ENGLISH', null, e.en, e.ko); await say(e.en); await wait(2500);
@@ -842,53 +816,44 @@
 
   /* ═════════ 실력 점검 ═════════ */
   ROUTES.test = function () {
-    const useMic = Speech.srOK;
     const plan = [];
-    for (const lv of [1, 2, 3]) {
-      const ex = shuffle(EXPRESSIONS.filter((e) => e.lv === lv));
-      const dx = shuffle(ALL_DICT.filter((e) => e.lv === lv && !ex.slice(0, 1).includes(e)));
-      plan.push({ type: 'dict', e: dx[0], lv }, { type: useMic ? 'speak' : 'dict', e: ex[0], lv }, { type: 'dict', e: dx[1], lv });
-    }
+    for (const lv of [1, 2, 3]) for (const e of shuffle(EXPRESSIONS.filter((x) => x.lv === lv)).slice(0, 3)) plan.push({ type: Speech.srOK ? 'speak' : 'type', e, lv });
     const res = [];
     let idx = 0;
-    view.innerHTML = `<h1>🩺 실력 점검</h1><div class="card"><p>레벨별 3문항씩 총 9문항 (딕테이션${useMic ? ' + 스피킹' : ''}). 약 3분.</p><p class="muted small">결과에 따라 시작 레벨이 자동 설정되고, 점수 그래프의 기준점이 됩니다.</p></div><button class="primary block huge" data-act="go">시작</button>`;
+    view.innerHTML = `<h1>🩺 실력 점검</h1><div class="card"><p>한국어를 보고 <b>영어로 말하기</b> 9문항 (레벨별 3문항). 약 3분.</p><p class="muted small">결과에 따라 시작 레벨이 자동 설정되고, 점수 그래프의 기준점이 됩니다.</p></div><button class="primary block huge" data-act="go">시작</button>`;
     bind({ go: step });
     function step() {
+      viewGen++;
       if (idx >= plan.length) return done();
       const it = plan[idx], e = it.e;
-      if (it.type === 'dict') {
-        view.innerHTML = `${progress(idx, plan.length)}<div class="muted small">🩺 ${idx + 1}/${plan.length} · 듣고 받아쓰기</div>
-          <div class="card" style="text-align:center"><div class="grid2"><button class="primary big" data-act="play">▶︎ 듣기</button><button class="big" data-act="slow">🐢 느리게</button></div></div>
-          <textarea id="ans" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="들은 문장 입력"></textarea>
+      if (it.type === 'type') {
+        view.innerHTML = `${progress(idx, plan.length)}<div class="muted small">🩺 ${idx + 1}/${plan.length} · 영어로 옮기기</div>
+          <div class="card"><div class="ko">${esc(e.ko)}</div></div>
+          <textarea id="ans" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="영어로 입력 (키보드 🎙️ 받아쓰기 가능)"></textarea>
           <div class="grid2" style="margin-top:10px"><button data-act="pass">모르겠음</button><button class="primary" data-act="ok">제출</button></div>`;
-        bind({
-          play: () => Speech.speak(e.en), slow: () => Speech.speak(e.en, { rate: 0.7 }),
-          pass: () => finishItem(0), ok: () => finishItem(C.compare(e.en, $('#ans').value).score),
-        });
-        Speech.speak(e.en);
+        bind({ pass: () => finishItem(0), ok: () => finishItem(C.compare(e.en, $('#ans').value).score) });
       } else {
         view.innerHTML = `${progress(idx, plan.length)}<div class="muted small">🩺 ${idx + 1}/${plan.length} · 영어로 말하기</div>
           <div class="card"><div class="ko">${esc(e.ko)}</div></div><div id="live" class="live"></div>
           <button class="primary block huge" data-act="mic" id="mic">🎤 탭하고 말하기</button>
           <button class="ghost block" style="margin-top:10px" data-act="pass">모르겠음</button>`;
         let h = null;
-        bind({
-          pass: () => { if (h) h.stop(); finishItem(0); },
-          mic: async (b) => {
-            if (h) { h.stop(); return; }
-            b.classList.add('mic-on'); b.textContent = '⏹ 끝내기';
-            $('#live').textContent = listenHint();
-            h = Speech.listen(endOpts({ expectWords: wc(e.en), onInterim: (s) => ($('#live').textContent = s) }));
-            try { const s = await h.promise; h = null; if (!s) { b.classList.remove('mic-on'); b.textContent = '🎤 다시 말하기'; return; } finishItem(C.compare(e.en, s).score); }
-            catch (c) { h = null; toast(srErrorMsg(c), 4000); plan[idx] = { type: 'dict', e, lv: it.lv }; step(); }
-          },
-        });
+        const mic = async (b, auto) => {
+          if (h) { h.stop(); return; }
+          b.classList.add('mic-on'); b.textContent = '⏹ 끝내기';
+          $('#live').textContent = listenHint();
+          h = Speech.listen(endOpts({ expectWords: wc(e.en), noSpeechMs: auto ? 12000 : 8000, onInterim: (t) => ($('#live').textContent = t) }));
+          try { const t = await h.promise; h = null; if (!t) { b.classList.remove('mic-on'); b.textContent = '🎤 다시 말하기'; $('#live').textContent = '음성이 들리지 않았어요. 다시 탭하세요.'; return; } finishItem(C.compare(e.en, t).score); }
+          catch (c) { h = null; b.classList.remove('mic-on'); b.textContent = '🎤 탭하고 말하기'; if (auto) return; toast(srErrorMsg(c), 4000); plan[idx] = { type: 'type', e, lv: it.lv }; step(); }
+        };
+        bind({ pass: () => { if (h) h.stop(); finishItem(0); }, mic: (b) => mic(b) });
+        if (autoMicOn()) mic($('#mic'), true);
       }
     }
     function finishItem(score) {
       Speech.stop();
       res.push({ lv: plan[idx].lv, s: score });
-      record(plan[idx].type === 'speak' ? 'speak' : 'dict', score, plan[idx].lv);
+      record('speak', score, plan[idx].lv);
       idx++; step();
     }
     function done() {
@@ -956,6 +921,7 @@
     cleanupFns.push(() => { if (rec) rec.stop(); });
 
     function card() {
+      viewGen++;
       const it = items[idx];
       hinted = mode === 'learn';
       const learn = mode === 'learn';
@@ -981,22 +947,26 @@
         toggleType: () => { typing = !typing; card(); },
         skip: next,
         submitTyped: () => { const v = $('#typed').value.trim(); if (!v) return toast('입력해 주세요'); evaluate(v); },
-        mic: startMic,
+        mic: (b) => startMic(b),
       });
-      if (learn) sayFr(it.fr);
+      const g = viewGen;
+      if (learn) sayFr(it.fr).then(() => { if (g === viewGen && autoMicOn() && !typing && !rec) startMic($('#mic'), true); }); // 듣고 → 바로 따라 말하기
+      else if (autoMicOn() && !typing) startMic($('#mic'), true);
     }
-    async function startMic(btn) {
+    async function startMic(btn, auto) {
       if (rec) { rec.stop(); return; }
       Speech.stop();
       const live = $('#live'); live.classList.remove('hidden'); live.textContent = listenHint();
       btn.classList.add('mic-on'); btn.textContent = '⏹ 말하기 끝내기';
-      rec = Speech.listen(endOpts({ lang: 'fr-FR', expectWords: wc(items[idx].fr), onInterim: (s) => (live.textContent = s) }));
+      rec = Speech.listen(endOpts({ lang: 'fr-FR', expectWords: wc(items[idx].fr), noSpeechMs: auto ? 12000 : 8000, onInterim: (s) => (live.textContent = s) }));
       try {
         const said = await rec.promise; rec = null;
         if (!said) { btn.classList.remove('mic-on'); btn.textContent = '🎤 다시 말하기'; live.textContent = '음성이 들리지 않았어요. 다시 탭해서 말해보세요.'; return; }
         evaluate(said);
       } catch (code) {
-        rec = null; toast(srErrorMsg(code), 5000);
+        rec = null;
+        if (auto) { btn.classList.remove('mic-on'); btn.textContent = '🎤 탭하고 말하기'; live.classList.add('hidden'); return; }
+        toast(srErrorMsg(code), 5000);
         if (code === 'not-allowed' || code === 'service-not-allowed' || code === 'unsupported' || Speech.srFails >= 2) typing = true;
         card();
       }
@@ -1010,6 +980,7 @@
       showResult(it, r, s, said, xp);
     }
     function showResult(it, r, s, said, xp, retry) {
+      viewGen++;
       const [em, msg] = r.score === 100 ? ['😎', 'Parfait ! 완벽해요'] : r.score >= 85 ? ['🥐', 'Très bien ! 아주 좋아요'] : r.score >= 70 ? ['👍', 'Bien ! 거의 다 왔어요'] : r.score >= 50 ? ['🤏', 'Presque… 한 번 더!'] : ['🫣', 'Courage ! 천천히 다시 들어봐요'];
       view.innerHTML = `${progress(idx + 1, items.length)}
         <div class="card">
@@ -1098,6 +1069,7 @@
  <label>🎤 말 끝 감지 (마이크가 너무 빨리 꺼지면 '여유' 또는 '수동')</label>
         <div class="chips">${[['fast', '빠름 1.5초'], ['normal', '보통 2.5초'], ['relaxed', '여유 4초'], ['manual', '수동 (⏹ 눌러 종료)']].map(([k, v]) => `<button data-act="endm" data-k="${k}" class="${(S.settings.endMode || 'normal') === k ? 'on' : ''}">${v}</button>`).join('')}</div>
         <p class="muted small">수동이어도 운전 모드는 핸즈프리라 4초 침묵 시 자동 종료돼요.</p>
+        <label><input type="checkbox" id="automic" ${S.settings.autoMic !== false ? 'checked' : ''}> 🎤 자동 마이크 (문제가 나오면 바로 듣기 시작)</label>
         <label><input type="checkbox" id="ko" ${S.settings.koPrompt ? 'checked' : ''}> 쉐도잉 모드에서 한국어 뜻 읽어주기</label>
       </div>
       <div class="card">
@@ -1146,6 +1118,7 @@
     $('#voice').onchange = (ev) => { S.settings.voice = ev.target.value; save(); };
     $('#rate').oninput = (ev) => { S.settings.rate = +ev.target.value; $('#rv').textContent = S.settings.rate.toFixed(2); save(); };
     $('#ko').onchange = (ev) => { S.settings.koPrompt = ev.target.checked; save(); };
+    $('#automic').onchange = (ev) => { S.settings.autoMic = ev.target.checked; save(); };
     $('#natural').onchange = (ev) => { S.settings.natural = ev.target.checked; save(); };
     audioStatus();
   };

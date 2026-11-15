@@ -12,11 +12,15 @@
     'ok': 'okay', 'e-mail': 'email', 'gonna': 'going to', 'wanna': 'want to',
   };
 
-  const NUM_FR = { un: '1', une: '1', deux: '2', trois: '3', quatre: '4', cinq: '5', six: '6', sept: '7', huit: '8', neuf: '9', dix: '10' };
+  const NUM_FR = { un: '1', une: '1', deux: '2', trois: '3', quatre: '4', cinq: '5', six: '6', sept: '7', huit: '8', neuf: '9', dix: '10',
+    onze: '11', douze: '12', treize: '13', quatorze: '14', quinze: '15', seize: '16', vingt: '20', trente: '30', cent: '100' };
   const SPECIAL_FR = { weekend: 'week end', ok: 'd accord' };
   /** 프랑스어: 악센트 무시(é→e), 엘리지옹 분리(l'eau → l eau), 숫자 통일(deux → 2) */
   function normalizeFr(text) {
-    const s = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const s = String(text || '').toLowerCase()
+      .replace(/(\d+)\s*h\s*(\d+)/g, '$1 heures $2').replace(/(\d+)\s*h\b/g, '$1 heures') // 15 h → 15 heures
+      .replace(/€/g, ' euros ').replace(/\bwi-?fi\b/g, 'wifi')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/\u0153/g, 'oe').replace(/\u00e6/g, 'ae')
       .replace(/[\u2018\u2019\u02bc`´']/g, ' ').replace(/-/g, ' ').replace(/[^a-z0-9\s]/g, ' ');
     const out = [];
@@ -203,7 +207,7 @@
     ['p10', '💯', '퍼펙트 10', '100점 10회', (st) => st.perfect >= 10],
     ['w30', '📗', '표현 30개', '표현 30개 학습', (st) => st.learned >= 30],
     ['wall', '📚', '표현 마스터', '모든 표현 학습', (st) => st.learned >= st.totalExpr],
-    ['d50', '🎧', '받아쓰기 50', '딕테이션 50회', (st) => st.dict >= 50],
+    ['sp100', '🗣️', '말하기 100', '스피킹 100회', (st) => st.speak >= 100],
     ['i5', '🎤', '면접 준비생', '면접 답변 5회', (st) => st.iv >= 5],
     ['drive', '🚗', '드라이브 러너', '오디오 모드 10문장 완주', (st) => st.audio >= 10],
     ['lv2', '⬆️', 'Intermediate', '레벨 2 도달', (st) => st.maxLv >= 2],

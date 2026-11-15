@@ -4,7 +4,6 @@ const F = require('../js/fr-data.js');
 const SYSTEM_EN = require('../js/audio-phrases.js').SYSTEM_EN;
 const en = new Set();
 D.EXPRESSIONS.forEach((e) => en.add(e.en));
-D.DICTATION_EXTRA.forEach((e) => en.add(e.en));
 D.INTERVIEW.forEach((q) => { en.add(q.q); en.add(q.a); });
 SYSTEM_EN.forEach((t) => en.add(t));
 const fr = new Set();

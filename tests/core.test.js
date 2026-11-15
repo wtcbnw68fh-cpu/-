@@ -104,7 +104,7 @@ console.log('OK', pass, 'test groups passed');
   const fs = require('fs'), path = require('path');
   const fnv = (str) => { let h = 0x811c9dc5; for (const b of Buffer.from(str, 'utf8')) { h ^= b; h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
   const D = require('../js/data.js'), F = require('../js/fr-data.js');
-  const need = [...D.EXPRESSIONS.map((e) => ['en', e.en]), ...D.DICTATION_EXTRA.map((e) => ['en', e.en]), ...D.INTERVIEW.flatMap((q) => [['en', q.q], ['en', q.a]]), ...F.FR_UNITS.flatMap((u) => u.items.map((i) => ['fr', i.fr]))];
+  const need = [...D.EXPRESSIONS.map((e) => ['en', e.en]), ...D.INTERVIEW.flatMap((q) => [['en', q.q], ['en', q.a]]), ...F.FR_UNITS.flatMap((u) => u.items.map((i) => ['fr', i.fr]))];
   const miss = need.filter(([l, t]) => !fs.existsSync(path.join(__dirname, '..', 'audio', l, fnv(l + '|' + t) + '.mp3')));
   assert.deepStrictEqual(miss, [], 'missing audio');
   console.log('OK audio files for', need.length, 'sentences');
