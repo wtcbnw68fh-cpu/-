@@ -17,7 +17,7 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ═════════ 저장소 ═════════ */
-  const APP_VERSION = '2.0 (11/15) · 일상회화 1000';
+  const APP_VERSION = '2.1 (11/15) · 테마 · 다시 말하기';
   const KEY = 'bizeng.v1';
   const DEF = {
     v: 1, level: 1, maxLv: 1, xp: 0, daily: {}, attempts: [], srs: {}, csrs: {}, dsrs: {}, iv: {}, badges: {},
@@ -288,7 +288,39 @@
     } catch (e) { /* 지원 안 함 */ }
   }
 
+  /* ═════════ 테마 ═════════ */
+  const THEMES = [
+    ['flag', '🇬🇧🇫🇷 특허청 (기본)', 'linear-gradient(90deg,#012169 50%,#0055A4 50% 66%,#fff 66% 83%,#EF4135 83%)'],
+    ['classic', '🌑 클래식 (이전 버전)', 'linear-gradient(135deg,#0ea5e9,#6366f1)'],
+    ['mono', '⚪ 모노 라이트', 'linear-gradient(135deg,#ffffff 50%,#18181b 50%)'],
+    ['burgundy', '🍷 버건디 & 골드', 'linear-gradient(135deg,#7a1f33 60%,#d4a64a 60%)'],
+    ['forest', '🌲 포레스트', 'linear-gradient(135deg,#1f6f4a 60%,#e9e4d4 60%)'],
+  ];
+  function applyTheme() {
+    const t = THEMES.some(([k]) => k === S.settings.theme) ? S.settings.theme : 'flag';
+    document.body.dataset.theme = t;
+    const bg = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+    const meta = document.querySelector('meta[name=theme-color]'); if (meta && bg) meta.setAttribute('content', bg);
+  }
+  applyTheme();
+
   /* ═════════ 기록 · 보상 ═════════ */
+  /** '잘못 인식됐어요 · 다시 말하기' 용: 채점 직전 상태를 저장해 두고 되돌림 */
+  function snapshot(store, id) {
+    const k = today();
+    return { t: Date.now(), store, id, prev: store[id] ? Object.assign({}, store[id]) : undefined, xp0: S.xp, day: k,
+      d0: S.daily[k], h0: S.hist[k], g0: S.goalDays[k], b0: S.bestStreak, fr0: S.fr.att.length };
+  }
+  function undoSnapshot(sn) {
+    if (!sn) return;
+    if (sn.prev) sn.store[sn.id] = sn.prev; else delete sn.store[sn.id];
+    while (S.attempts.length && S.attempts[S.attempts.length - 1].t >= sn.t) S.attempts.pop();
+    if (S.fr.att.length > sn.fr0) S.fr.att.length = sn.fr0;
+    S.xp = sn.xp0; S.bestStreak = sn.b0;
+    const restore = (obj, v) => { if (v === undefined) delete obj[sn.day]; else obj[sn.day] = v; };
+    restore(S.daily, sn.d0); restore(S.hist, sn.h0); restore(S.goalDays, sn.g0);
+    save();
+  }
   function today() { return C.dayKey(Date.now()); }
   function record(m, s, lv, opts = {}) {
     const now = Date.now(), k = C.dayKey(now);
@@ -356,7 +388,7 @@
   document.body.insertAdjacentHTML('afterbegin', `<header id="brand">${flagPair('b', 'flag')}<div class="grow"><div class="t">BizTalk</div><div class="s">Patent English · Français</div></div><button id="gear" aria-label="설정">⚙️</button></header>`);
   function stampHtml(score) {
     if (score >= 85) return '<div class="stamp granted">등록결정<small>GRANTED</small></div>';
-    if (score >= 60) return '<div class="stamp amend">보정요구<small>AMEND</small></div>';
+    if (score >= 50) return '<div class="stamp amend">보정요구<small>AMEND</small></div>';
     return '<div class="stamp rejected">거절결정<small>REJECTED</small></div>';
   }
   function imgKey(id) { return 'bizeng.img.' + id; }
@@ -433,12 +465,12 @@
     const pts = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
     const last = vals.length - 1;
     return `<div class="chart" id="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <line x1="${P}" x2="${W - P}" y1="${y(lo)}" y2="${y(lo)}" stroke="#334155" stroke-width="1"/>
-      <line x1="${P}" x2="${W - P}" y1="${y(hi)}" y2="${y(hi)}" stroke="#1e293b" stroke-width="1"/>
-      <text x="2" y="${y(hi) + 4}" fill="#94a3b8" font-size="10">${hi}</text><text x="2" y="${y(lo) + 4}" fill="#94a3b8" font-size="10">${lo}</text>
-      <polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-      <circle cx="${x(last)}" cy="${y(vals[last])}" r="4" fill="#38bdf8" stroke="#1e293b" stroke-width="2"/>
-      <text x="${x(last)}" y="${y(vals[last]) - 9}" fill="#f1f5f9" font-size="11" font-weight="700" text-anchor="end">${vals[last]}</text>
+      <line x1="${P}" x2="${W - P}" y1="${y(lo)}" y2="${y(lo)}" class="grid" stroke-width="1"/>
+      <line x1="${P}" x2="${W - P}" y1="${y(hi)}" y2="${y(hi)}" class="grid" stroke-width="1" opacity=".5"/>
+      <text x="2" y="${y(hi) + 4}" class="lbl" font-size="10">${hi}</text><text x="2" y="${y(lo) + 4}" class="lbl" font-size="10">${lo}</text>
+      <polyline points="${pts}" fill="none" class="line" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      <circle cx="${x(last)}" cy="${y(vals[last])}" r="4" class="dot" stroke-width="2"/>
+      <text x="${x(last)}" y="${y(vals[last]) - 9}" class="val" font-size="11" font-weight="700" text-anchor="end">${vals[last]}</text>
     </svg><div class="tip hidden"></div></div>
     <div class="row muted small"><span>${days[0].slice(5)}</span><span class="grow"></span><span>${days[last].slice(5)}</span></div>`;
   }
@@ -486,7 +518,7 @@
           <div class="no">등록번호 제 10-${new Date().getFullYear()}-${String(score).padStart(7, '0')} 호</div>
           <div class="small muted">BizTalk Score</div>
           <div class="row" style="align-items:flex-end;gap:6px"><div class="score">${score}</div><div class="muted" style="margin-bottom:6px">/1000</div></div>
-          ${delta != null ? `<div class="small" style="font-weight:700;color:${delta >= 0 ? '#15803d' : '#b91c1c'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)} <span class="muted">(7일 전 대비)</span></div>` : ''}
+          ${delta != null ? `<div class="small" style="font-weight:700;color:${delta >= 0 ? 'var(--cert-up)' : 'var(--cert-down)'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)} <span class="muted">(7일 전 대비)</span></div>` : ''}
           <div class="kv">권리자 등급 <b>${rk.icon} ${rk.name}</b> · 심사 단계 <b>Lv${S.level} ${C.LEVELS[S.level]}</b></div>
           <div class="row small" style="margin-top:12px"><span>오늘 목표 ${tXp}/${goal} XP</span><span class="grow"></span><span>🔥 ${stk}일 연속</span></div>
           <div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, (tXp / goal) * 100)}%"></i></div>
@@ -590,7 +622,7 @@
       try {
         const said = await recHandle.promise;
         recHandle = null;
-        if (!said) { btn.classList.remove('mic-on'); btn.textContent = '🎤 탭하고 말하기'; live.textContent = '음성이 들리지 않았어요. 다시 탭해서 말해보세요.'; return; }
+        if (!said) { btn.classList.remove('mic-on'); btn.textContent = '🔁 다시 말하기'; live.textContent = '음성이 들리지 않았어요. 버튼을 눌러 다시 말해보세요.'; return; }
         evaluate(said);
       } catch (code) {
         recHandle = null;
@@ -600,11 +632,13 @@
         card();
       }
     }
+    let lastSnap = null;
     function evaluate(said) {
       const e = items[idx];
       const r = C.compare(e.en, said);
       let s = r.score;
       if (hinted) s = Math.min(s, 80);
+      lastSnap = snapshot(storeOf(e), e.id);
       storeOf(e)[e.id] = C.srsUpdate(storeOf(e)[e.id], s, Date.now());
       const xp = record('speak', s, e.lv);
       results.push(s);
@@ -621,7 +655,8 @@
           <h3 style="margin-top:14px">정답과 비교</h3>
           <div class="diff">${diffHtml(r)}</div>
           <div class="legend"><b style="color:var(--ok)">초록</b> 맞음 · <b style="color:var(--near)">노랑</b> 비슷함 · <b style="color:var(--bad)">빨강</b> 빠짐 ${r.extra ? '· 불필요한 단어 ' + r.extra + '개' : ''}</div>
-          <h3 style="margin-top:12px">내가 말한 것</h3><div class="muted">${esc(said)}</div>
+          <h3 style="margin-top:12px">내가 말한 것 (인식 결과)</h3><div class="muted">${esc(said)}</div>
+          ${lastSnap ? '<button class="redo" data-act="redo">🎙️ 잘못 인식됐어요 · 다시 말하기 <span class="small muted">(이번 점수 취소)</span></button>' : ''}
           <h3 style="margin-top:12px">정답</h3><div class="en">${esc(e.en)}</div><div class="muted">${esc(e.ko)}</div>
           ${e.tip ? `<div class="tipbox">📝 ${esc(e.tip)}</div>` : ''}
         </div>
@@ -635,7 +670,8 @@
       bind({
         listen: () => Speech.speak(e.en),
         retry: (btn) => retryMic(btn, false),
-        next: () => { idx++; if (idx < items.length) card(); else summary(); },
+        redo: () => { Speech.stop(); if (recHandle) { recHandle.stop(); recHandle = null; } undoSnapshot(lastSnap); lastSnap = null; results.pop(); toast('이번 점수를 취소했어요. 다시 말해보세요!'); card(); },
+        next: () => { lastSnap = null; idx++; if (idx < items.length) card(); else summary(); },
       });
       async function retryMic(btn, auto) {
         if (recHandle) { recHandle.stop(); return; }
@@ -1020,11 +1056,13 @@
         card();
       }
     }
+    let frSnap = null;
     function evaluate(said) {
       const it = items[idx];
       const r = C.compare(it.fr, said, 'fr');
       // 배우기(보고 따라 말하기)는 퀴즈보다 쉬우므로 숙련도 반영을 80점까지로 제한
       const s = hinted ? Math.min(r.score, 80) : r.score;
+      frSnap = snapshot(S.fr.srs, it.id);
       const xp = frRecord(it, s); results.push(s);
       showResult(it, r, s, said, xp);
     }
@@ -1037,13 +1075,16 @@
           <h3 style="margin-top:14px">정답과 비교</h3><div class="diff">${r.words.map((x) => `<span class="${x.st}">${esc(x.w)}</span>`).join(' ')}</div>
           <div style="color:var(--acc);margin-top:4px">[${esc(it.pr)}] · ${esc(it.ko)}</div>
           <h3 style="margin-top:12px">내 답 (인식 결과)</h3><div class="muted">${esc(said)}</div>
+          ${frSnap ? '<button class="redo" data-act="redo">🎙️ 잘못 인식됐어요 · 다시 말하기 <span class="small muted">(이번 점수 취소)</span></button>' : ''}
           ${it.note ? `<div class="tipbox">📝 ${esc(it.note)}</div>` : ''}
           ${r.score < 70 ? '<p class="muted small">💡 짧은 단어는 인식이 까다로워요. 또박또박, 조금 크게 말해보세요.</p>' : ''}
         </div>
         <div class="grid3"><button data-act="play">🔊</button><button data-act="slow">🐢</button><button data-act="retry">🔁 다시</button></div>
         <button class="primary block big" style="margin-top:10px" data-act="next">${idx + 1 < items.length ? '다음 →' : '결과 보기'}</button>`;
       bind({
-        play: () => sayFr(it.fr), slow: () => sayFr(it.fr, 0.7), next,
+        play: () => sayFr(it.fr), slow: () => sayFr(it.fr, 0.7),
+        next: () => { frSnap = null; next(); },
+        redo: () => { Speech.stop(); if (rec) { rec.stop(); rec = null; } undoSnapshot(frSnap); frSnap = null; results.pop(); toast('이번 점수를 취소했어요. 다시 말해보세요!'); card(); },
         retry: async (btn) => {
           if (!Speech.srOK || typing) { const v = prompt('프랑스어로 입력하세요'); if (v) showResult(it, C.compare(it.fr, v, 'fr'), s, v, 0, true); return; }
           btn.classList.add('mic-on'); btn.textContent = '듣는 중…';
@@ -1122,6 +1163,10 @@
         <label><input type="checkbox" id="ko" ${S.settings.koPrompt ? 'checked' : ''}> 쉐도잉 모드에서 한국어 뜻 읽어주기</label>
       </div>
       <div class="card">
+        <h3>🎨 테마</h3>
+        <div class="themes">${THEMES.map(([k, name, sw]) => `<button data-act="theme" data-k="${k}" class="${(S.settings.theme || 'flag') === k ? 'on' : ''}"><span class="sw" style="background:${sw}"></span>${name}</button>`).join('')}</div>
+      </div>
+      <div class="card">
         <label>하루 목표</label>
         <div class="chips">${[30, 50, 100, 150].map((g) => `<button data-act="goal" data-g="${g}" class="${S.settings.goal === g ? 'on' : ''}">${g} XP${g === 50 ? ' (약 10분)' : ''}</button>`).join('')}</div>
         <label>난이도 직접 선택 (현재 Lv${S.level})</label>
@@ -1138,6 +1183,7 @@
     bind({
       home: () => go('home'),
       update: forceUpdate,
+      theme: (el) => { S.settings.theme = el.dataset.k; save(); applyTheme(); ROUTES.settings(); },
       dlaudio: (b) => { b.disabled = true; prefetchAudio(true).then(() => { b.disabled = false; }); },
       endm: (el) => { S.settings.endMode = el.dataset.k; save(); ROUTES.settings(); toast('말 끝 감지: ' + el.textContent); },
       test: () => { S.settings.voice = $('#voice').value; save(); Speech.speak("Thank you for your patience. I'll keep you posted."); },
@@ -1157,12 +1203,12 @@
             if (!d.state || !Array.isArray(d.state.attempts)) throw new Error('bad');
             localStorage.setItem(KEY, JSON.stringify(d.state));
             for (const [k, v] of Object.entries(d.imgs || {})) if (k.startsWith('bizeng.img.')) localStorage.setItem(k, v);
-            S = load(); toast('✅ 복원 완료'); go('home');
+            S = load(); applyTheme(); toast('✅ 복원 완료'); go('home');
           } catch (e) { toast('⚠️ 올바른 백업 파일이 아니에요'); }
         };
         inp.click();
       },
-      reset: () => { if (confirm('정말 모든 기록을 지울까요? (되돌릴 수 없음)')) { localStorage.removeItem(KEY); S = load(); go('home'); } },
+      reset: () => { if (confirm('정말 모든 기록을 지울까요? (되돌릴 수 없음)')) { localStorage.removeItem(KEY); S = load(); applyTheme(); go('home'); } },
     });
     $('#voice').onchange = (ev) => { S.settings.voice = ev.target.value; save(); };
     $('#rate').oninput = (ev) => { S.settings.rate = +ev.target.value; $('#rv').textContent = S.settings.rate.toFixed(2); save(); };
