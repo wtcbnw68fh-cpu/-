@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>🐙 문어 무니 간지럽히기</title>
+<title>🐙 문어 간지럽히기</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
@@ -31,50 +31,49 @@
     100% { transform: translate(-10px, -110vh); opacity: 0; }
   }
   .weed { position: fixed; bottom: 0; width: 70px; transform-origin: bottom center; animation: sway 4s ease-in-out infinite; z-index: 0; pointer-events: none; }
-  .weed.l { left: 4%; } .weed.r { right: 5%; animation-delay: -2s; width: 55px; }
+  .weed.l { left: 3%; } .weed.r { right: 4%; animation-delay: -2s; width: 55px; }
   @keyframes sway { 0%,100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
 
-  main { position: relative; z-index: 1; width: 100%; max-width: 480px; padding: 22px 18px 28px; display: flex; flex-direction: column; align-items: center; }
-  h1 { font-size: 30px; font-weight: 400; color: #fff; text-shadow: 0 3px 0 #ff6f91, 0 6px 14px rgba(29,53,87,.25); letter-spacing: 1px; }
+  main { position: relative; z-index: 1; width: 100%; max-width: 480px; padding: 24px 18px 28px; display: flex; flex-direction: column; align-items: center; }
+  h1 { font-size: 32px; font-weight: 400; color: #fff; text-shadow: 0 3px 0 #e2577f, 0 6px 14px rgba(29,53,87,.25); letter-spacing: 1px; }
   .sub { margin-top: 6px; font-size: 16px; color: #1d4e89; opacity: .85; }
 
-  .speech {
-    position: relative; margin-top: 18px; background: #fff; padding: 12px 20px; border-radius: 22px;
-    font-size: 19px; min-height: 48px; display: flex; align-items: center; justify-content: center; text-align: center;
-    box-shadow: 0 6px 0 rgba(29,53,87,.12); transition: transform .15s;
-  }
-  .speech::after {
-    content: ""; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
-    border: 12px solid transparent; border-top-color: #fff; border-bottom: 0;
-  }
-  .speech.pop { transform: scale(1.06); }
-
-  .stage { position: relative; width: 100%; max-width: 340px; margin-top: 6px; touch-action: none; cursor: grab; }
+  .stage { position: relative; width: 100%; max-width: 340px; margin-top: 14px; touch-action: none; cursor: grab; }
   .stage:active { cursor: grabbing; }
   .stage svg { width: 100%; height: auto; display: block; overflow: visible; }
 
-  .fx { position: absolute; pointer-events: none; font-size: 22px; color: #ff4f81; white-space: nowrap;
-        text-shadow: 0 2px 0 #fff, 0 0 6px #fff; animation: floaty 1s ease-out forwards; z-index: 3; }
-  @keyframes floaty {
-    0% { transform: translate(-50%, -50%) scale(.4) rotate(var(--r)); opacity: 0; }
-    20% { transform: translate(-50%, -80%) scale(1.15) rotate(var(--r)); opacity: 1; }
-    100% { transform: translate(calc(-50% + var(--dx)), -260%) scale(1) rotate(var(--r)); opacity: 0; }
+  .ink { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: 0; background: rgba(0,0,0,.55); }
+  .ink span { position: absolute; border-radius: 50%; transform: translate(-50%,-50%);
+              background: radial-gradient(circle, #000 0%, #050505 58%, rgba(0,0,0,0) 72%); }
+  .ink.show { animation: inky 2.4s ease-out forwards; }
+  @keyframes inky {
+    0% { opacity: 0; transform: scale(.3); }
+    12% { opacity: 1; transform: scale(1.05); }
+    65% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.08); }
+  }
+  .ink-msg {
+    position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 6;
+    color: #fff; font-size: 24px; text-align: center; white-space: nowrap; pointer-events: none;
+    text-shadow: 0 2px 10px rgba(0,0,0,.8); opacity: 0;
+  }
+  .ink-msg.show { animation: msg 2.4s ease-out forwards; }
+  @keyframes msg {
+    0%, 10% { opacity: 0; transform: translate(-50%, -40%); }
+    25% { opacity: 1; transform: translate(-50%, -50%); }
+    75% { opacity: 1; transform: translate(-50%, -50%); }
+    100% { opacity: 0; transform: translate(-50%, -60%); }
   }
 
-  .ink { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: 0; }
-  .ink span { position: absolute; border-radius: 50%; background: radial-gradient(circle, #2d1b4e 0%, #3c2a63 55%, rgba(60,42,99,0) 72%); }
-  .ink.show { animation: inky 1.6s ease-out forwards; }
-  @keyframes inky { 0% { opacity: 0; transform: scale(.3); } 15% { opacity: .92; transform: scale(1.05); } 55% { opacity: .85; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
-
-  .meter-wrap { width: 100%; max-width: 340px; margin-top: 4px; }
+  .meter-wrap { width: 100%; max-width: 340px; margin-top: 8px; }
   .meter-label { display: flex; justify-content: space-between; font-size: 15px; color: #1d4e89; margin-bottom: 6px; }
   .meter { height: 18px; border-radius: 999px; background: rgba(255,255,255,.6); overflow: hidden; border: 3px solid #fff; }
   .meter i { display: block; height: 100%; width: 0%; border-radius: 999px;
-             background: linear-gradient(90deg, #ffd166, #ff8fab, #ff4f81); transition: width .08s linear; }
+             background: linear-gradient(90deg, #ffd166, #f08aa8, #e2577f); transition: width .08s linear; }
 
   .stats { display: flex; gap: 10px; margin-top: 16px; width: 100%; max-width: 340px; }
   .stat { flex: 1; background: rgba(255,255,255,.85); border-radius: 18px; padding: 10px 8px; text-align: center; box-shadow: 0 4px 0 rgba(29,53,87,.1); }
-  .stat b { display: block; font-size: 26px; font-weight: 400; color: #ff4f81; }
+  .stat b { display: block; font-size: 26px; font-weight: 400; color: #e2577f; }
   .stat small { font-size: 13px; color: #457b9d; }
 
   .row { display: flex; gap: 10px; margin-top: 14px; }
@@ -91,56 +90,73 @@
   <svg class="weed l" viewBox="0 0 60 160" aria-hidden="true"><path d="M30 160 C10 130 45 110 25 80 C8 55 40 40 28 5" stroke="#2a9d8f" stroke-width="12" fill="none" stroke-linecap="round"/><path d="M38 160 C55 135 30 120 46 95" stroke="#52b69a" stroke-width="9" fill="none" stroke-linecap="round"/></svg>
   <svg class="weed r" viewBox="0 0 60 160" aria-hidden="true"><path d="M30 160 C48 130 14 105 34 75 C50 50 20 35 32 10" stroke="#40916c" stroke-width="12" fill="none" stroke-linecap="round"/></svg>
   <div class="ink" id="ink"></div>
+  <div class="ink-msg" id="inkMsg">너무 많이 간지럽혔나보다...</div>
 
   <main>
-    <h1>🐙 무니 간지럽히기</h1>
+    <h1>🐙 문어 간지럽히기</h1>
     <p class="sub">문어를 문지르거나 톡톡 눌러보세요!</p>
 
-    <div class="speech" id="speech">안녕! 나는 문어 무니야 🐙</div>
-
     <div class="stage" id="stage">
-      <svg viewBox="0 0 300 320" aria-label="귀여운 문어 무니">
-        <ellipse cx="150" cy="306" rx="95" ry="10" fill="rgba(29,53,87,.15)"/>
+      <svg viewBox="0 0 300 300" aria-label="귀여운 문어">
+        <defs>
+          <radialGradient id="skin" cx="38%" cy="30%" r="75%">
+            <stop offset="0%" stop-color="#f07b9c"/>
+            <stop offset="70%" stop-color="#e2577f"/>
+            <stop offset="100%" stop-color="#d44a73"/>
+          </radialGradient>
+          <radialGradient id="cheek">
+            <stop offset="0%" stop-color="#ff2f63" stop-opacity=".9"/>
+            <stop offset="100%" stop-color="#ff2f63" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="150" cy="282" rx="85" ry="9" fill="rgba(29,53,87,.15)"/>
         <g id="octo">
-          <g id="tentacles"></g>
-          <!-- 머리 -->
-          <ellipse cx="150" cy="128" rx="96" ry="88" fill="#ff8fab" stroke="#f0668c" stroke-width="4"/>
-          <ellipse cx="150" cy="196" rx="78" ry="22" fill="#ff8fab"/>
-          <ellipse cx="116" cy="70" rx="24" ry="12" fill="#fff" opacity=".35" transform="rotate(-25 116 70)"/>
-          <circle cx="196" cy="72" r="9" fill="#ffb3c6"/>
-          <circle cx="214" cy="94" r="6" fill="#ffb3c6"/>
-          <circle cx="86" cy="104" r="6" fill="#ffb3c6"/>
+          <!-- 외곽선 레이어 -->
+          <g id="legsLine"></g>
+          <g id="armLine"></g>
+          <ellipse cx="150" cy="125" rx="102" ry="95" fill="#e2577f" stroke="#2a1d1d" stroke-width="5"/>
+          <!-- 채우기 레이어 (머리와 다리 이음새 감추기) -->
+          <g id="legsFill"></g>
+          <g id="armFill"></g>
+          <ellipse cx="108" cy="68" rx="42" ry="22" fill="#fff" opacity=".16" transform="rotate(-28 108 68)"/>
+
           <!-- 볼터치 -->
-          <g id="blush" opacity=".35">
-            <ellipse cx="94" cy="166" rx="17" ry="9" fill="#ff4d79"/>
-            <ellipse cx="206" cy="166" rx="17" ry="9" fill="#ff4d79"/>
+          <g id="blush" opacity=".75">
+            <ellipse cx="92" cy="152" rx="26" ry="20" fill="url(#cheek)"/>
+            <ellipse cx="214" cy="120" rx="26" ry="20" fill="url(#cheek)"/>
           </g>
+
           <!-- 눈 (기본) -->
           <g id="eyesOpen">
-            <g id="eyeL">
-              <ellipse cx="116" cy="136" rx="20" ry="22" fill="#fff"/>
-              <g class="pupil"><circle cx="118" cy="139" r="12" fill="#2b2d42"/><circle cx="123" cy="133" r="5" fill="#fff"/><circle cx="113" cy="145" r="2.5" fill="#fff"/></g>
-            </g>
-            <g id="eyeR">
-              <ellipse cx="184" cy="136" rx="20" ry="22" fill="#fff"/>
-              <g class="pupil"><circle cx="186" cy="139" r="12" fill="#2b2d42"/><circle cx="191" cy="133" r="5" fill="#fff"/><circle cx="181" cy="145" r="2.5" fill="#fff"/></g>
-            </g>
+            <g id="eyeL"><ellipse cx="107" cy="135" rx="10.5" ry="11.5" fill="#1a1414"/><circle cx="104" cy="131" r="3.6" fill="#fff"/></g>
+            <g id="eyeR"><ellipse cx="181" cy="112" rx="10.5" ry="11.5" fill="#1a1414"/><circle cx="178" cy="108" r="3.6" fill="#fff"/></g>
           </g>
           <!-- 눈 (웃을 때 ^^) -->
-          <g id="eyesHappy" style="display:none" stroke="#2b2d42" stroke-width="6" stroke-linecap="round" fill="none">
-            <path d="M100 142 Q116 120 132 142"/>
-            <path d="M168 142 Q184 120 200 142"/>
+          <g id="eyesHappy" style="display:none" stroke="#1a1414" stroke-width="5" stroke-linecap="round" fill="none">
+            <path d="M96 139 Q107 124 118 139"/>
+            <path d="M170 116 Q181 101 192 116"/>
           </g>
           <!-- 웃음 눈물 -->
-          <g id="tears" style="display:none" fill="#7fd3ff" stroke="#fff" stroke-width="2">
-            <path d="M88 128 q-10 14 0 18 q10 -4 0 -18z"/>
-            <path d="M212 128 q-10 14 0 18 q10 -4 0 -18z"/>
+          <g id="tears" style="display:none" fill="#8fd8ff" stroke="#2a1d1d" stroke-width="2">
+            <path d="M88 138 q-9 13 0 17 q9 -4 0 -17z"/>
+            <path d="M201 114 q-9 13 0 17 q9 -4 0 -17z"/>
           </g>
-          <!-- 입 -->
-          <path id="mouthIdle" d="M139 168 Q150 180 161 168" stroke="#2b2d42" stroke-width="5" stroke-linecap="round" fill="none"/>
-          <g id="mouthLaugh" style="display:none">
-            <path d="M130 162 Q150 206 170 162 Z" fill="#8b1e3f" stroke="#2b2d42" stroke-width="4" stroke-linejoin="round"/>
-            <ellipse cx="150" cy="184" rx="10" ry="6" fill="#ff6b8b"/>
+
+          <!-- 입 (동그란 주둥이) -->
+          <g id="snout">
+            <ellipse cx="147" cy="133" rx="16" ry="14" fill="#f4a3b8" stroke="#2a1d1d" stroke-width="4"/>
+            <ellipse id="hole" cx="147" cy="133" rx="4" ry="4.5" fill="#2a1d1d"/>
+          </g>
+
+          <!-- 흔들림 표시 -->
+          <g id="wiggleMarks" stroke="#2a1d1d" stroke-width="3.5" stroke-linecap="round" fill="none">
+            <path d="M268 118 q6 10 4 22"/>
+            <path d="M282 112 q6 10 4 22"/>
+          </g>
+          <g id="laughMarks" style="display:none" stroke="#2a1d1d" stroke-width="3.5" stroke-linecap="round" fill="none">
+            <path d="M34 92 q-8 12 -4 26"/>
+            <path d="M22 100 q-8 12 -4 26"/>
+            <path d="M266 160 q8 -6 10 -18"/>
           </g>
         </g>
       </svg>
@@ -169,49 +185,41 @@
 (() => {
   const NS = "http://www.w3.org/2000/svg";
   const $ = (id) => document.getElementById(id);
-  const stage = $("stage"), octo = $("octo"), tentG = $("tentacles");
-  const speech = $("speech"), bar = $("bar"), pct = $("pct");
+  const stage = $("stage"), octo = $("octo");
+  const bar = $("bar"), pct = $("pct");
 
-  // ---------- 다리 만들기 ----------
-  const legs = [88, 113, 138, 162, 187, 212].map((x, i) => {
+  // ---------- 다리 (짧고 통통한 다리 5개) ----------
+  const LEG = "M-17 -10 C-19 22 -12 46 0 56 C8 63 20 60 18 49 C16 41 12 28 15 -10 Z";
+  function el(tag, attrs) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  const legs = [98, 124, 150, 176, 202].map((x, i) => {
     const dir = x < 150 ? -1 : 1;
-    const outer = document.createElementNS(NS, "g");
-    const inner = document.createElementNS(NS, "g");
-    inner.setAttribute("transform", `scale(${dir} 1)`);
-    inner.innerHTML =
-      `<path d="M0 0 C-14 32 14 58 2 86 C-5 104 6 120 22 112" stroke="#f0668c" stroke-width="27" fill="none" stroke-linecap="round"/>` +
-      `<path d="M0 0 C-14 32 14 58 2 86 C-5 104 6 120 22 112" stroke="#ff8fab" stroke-width="21" fill="none" stroke-linecap="round"/>` +
-      `<circle cx="-5" cy="34" r="3.6" fill="#ffd1dc"/><circle cx="3" cy="56" r="3.6" fill="#ffd1dc"/><circle cx="-1" cy="80" r="3.4" fill="#ffd1dc"/><circle cx="4" cy="101" r="3" fill="#ffd1dc"/>`;
-    outer.appendChild(inner);
-    tentG.appendChild(outer);
-    return { el: outer, x, base: -(x - 150) * 0.3, ph: i * 1.13 };
+    const line = el("g", {}), fill = el("g", {});
+    const pl = el("g", { transform: `scale(${dir} 1)` });
+    const pf = el("g", { transform: `scale(${dir} 1)` });
+    pl.appendChild(el("path", { d: LEG, fill: "#e2577f", stroke: "#2a1d1d", "stroke-width": 9, "stroke-linejoin": "round" }));
+    pf.appendChild(el("path", { d: LEG, fill: "#e2577f" }));
+    line.appendChild(pl); fill.appendChild(pf);
+    $("legsLine").appendChild(line); $("legsFill").appendChild(fill);
+    return { line, fill, x, base: -(x - 150) * 0.95, ph: i * 1.3 };
   });
+
+  // ---------- 흔드는 팔 ----------
+  const ARM = "M0 -17 C30 -24 56 -20 66 -8 C73 1 68 11 58 11 C44 11 26 9 0 17 Z";
+  const armLine = el("g", {}), armFill = el("g", {});
+  armLine.appendChild(el("path", { d: ARM, fill: "#e2577f", stroke: "#2a1d1d", "stroke-width": 9, "stroke-linejoin": "round" }));
+  armFill.appendChild(el("path", { d: ARM, fill: "#e2577f" }));
+  $("armLine").appendChild(armLine); $("armFill").appendChild(armFill);
 
   // ---------- 상태 ----------
   let level = 0, best = 0, count = 0, inks = 0;
-  let pressed = false, last = null, lastFx = 0, lastTickle = 0, cooldown = 0;
+  let pressed = false, last = null, lastHit = 0, lastTickle = 0, cooldown = 0;
   let muted = false, ctx = null;
   let blinkAt = performance.now() + 2500, blinking = 0;
-  let pupilT = { x: 0, y: 0 }, pupil = { x: 0, y: 0 };
-  let tier = "idle", idleIdx = 0, idleTimer = 0, wasLaughing = false;
-
-  const idleLines = ["안녕! 나는 문어 무니야 🐙", "나 간지럼 엄청 잘 타는데... 비밀이야 🤫", "톡톡 눌러보거나 슥슥 문질러봐!"];
-  const lines = {
-    t1: "흐흐... 거기 좀 간지러운데? 😆",
-    t2: "ㅋㅋㅋ 그만~ 간지럽다구!",
-    t3: "꺄하하하 살려줘~!! 🤣",
-    t4: "더는 못 참아..! 먹물 나온다!!",
-    after: "헥헥... 또 해줄 거지? 💕",
-    ink: "앗! 먹물 나와버렸다 ㅋㅋ 미안~ 🫧"
-  };
-  const words = ["ㅋㅋ", "히히", "꺄르르", "간지러워!", "ㅋㅋㅋㅋ", "하하하", "그만~!", "💕", "✨", "🫧", "까르르"];
-
-  function say(text) {
-    if (speech.textContent === text) return;
-    speech.textContent = text;
-    speech.classList.add("pop");
-    setTimeout(() => speech.classList.remove("pop"), 150);
-  }
+  let lookT = { x: 0, y: 0 }, look = { x: 0, y: 0 };
 
   // ---------- 소리 ----------
   function audio() {
@@ -219,9 +227,9 @@
     if (ctx && ctx.state === "suspended") ctx.resume();
     return ctx;
   }
-  function blip(f, t0, dur, type = "triangle", vol = 0.12) {
+  function blip(f, t0, dur, vol = 0.12) {
     const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = type;
+    o.type = "triangle";
     o.frequency.setValueAtTime(f, t0);
     o.frequency.exponentialRampToValueAtTime(f * 1.45, t0 + dur * 0.45);
     o.frequency.exponentialRampToValueAtTime(f * 0.95, t0 + dur);
@@ -240,52 +248,40 @@
     if (muted || !audio()) return;
     const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
     o.type = "sine";
-    o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.5);
-    g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.6);
+    o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.6);
+    g.gain.setValueAtTime(0.28, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.7);
   }
 
-  // ---------- 효과 ----------
-  function fx(px, py) {
-    const d = document.createElement("div");
-    d.className = "fx";
-    d.textContent = words[(Math.random() * words.length) | 0];
-    d.style.left = px + "px"; d.style.top = py + "px";
-    d.style.setProperty("--dx", (Math.random() * 80 - 40) + "px");
-    d.style.setProperty("--r", (Math.random() * 30 - 15) + "deg");
-    d.style.fontSize = (18 + Math.random() * 10 + level * 0.08) + "px";
-    stage.appendChild(d);
-    setTimeout(() => d.remove(), 1000);
-  }
-
+  // ---------- 먹물 ----------
   function inkBurst() {
     inks++; $("ink-cnt").textContent = inks;
     best = 100; $("best").textContent = "100%";
-    const ink = $("ink");
+    const ink = $("ink"), msg = $("inkMsg");
     ink.innerHTML = "";
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 14; i++) {
       const s = document.createElement("span");
-      const size = 120 + Math.random() * 260;
+      const size = 180 + Math.random() * 320;
       s.style.width = s.style.height = size + "px";
       s.style.left = (Math.random() * 100) + "%"; s.style.top = (Math.random() * 100) + "%";
-      s.style.transform = "translate(-50%,-50%)";
       ink.appendChild(s);
     }
-    ink.classList.remove("show"); void ink.offsetWidth; ink.classList.add("show");
+    ink.classList.remove("show"); msg.classList.remove("show");
+    void ink.offsetWidth;
+    ink.classList.add("show"); msg.classList.add("show");
     blorp();
     if (navigator.vibrate) try { navigator.vibrate([30, 40, 60]); } catch (e) {}
-    level = 30; cooldown = performance.now() + 1600;
-    tier = "ink"; say(lines.ink);
+    level = 30; cooldown = performance.now() + 2200;
   }
 
-  function tickle(amount, px, py) {
+  function tickle(amount) {
     const now = performance.now();
     if (now < cooldown) return;
     level = Math.min(100, level + amount);
     lastTickle = now;
-    if (now - lastFx > 130) {
-      lastFx = now; count++; $("cnt").textContent = count;
-      fx(px, py); giggle();
+    if (now - lastHit > 130) {
+      lastHit = now; count++; $("cnt").textContent = count;
+      giggle();
       if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
     }
     if (level >= 100) inkBurst();
@@ -293,21 +289,21 @@
 
   function local(e) {
     const r = stage.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top, r };
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
   stage.addEventListener("pointerdown", (e) => {
     pressed = true; audio();
-    const p = local(e); last = p;
+    last = local(e);
     try { stage.setPointerCapture(e.pointerId); } catch (_) {}
-    tickle(7, p.x, p.y);
+    tickle(6);
   });
   stage.addEventListener("pointermove", (e) => {
     const p = local(e);
     if (pressed || e.pointerType === "mouse") {
       if (last) {
         const d = Math.hypot(p.x - last.x, p.y - last.y);
-        if (d > 2) tickle(Math.min(d * 0.09, 6), p.x, p.y);
+        if (d > 2) tickle(Math.min(d * 0.055, 4));
       }
       last = p;
     }
@@ -317,13 +313,13 @@
   stage.addEventListener("pointercancel", up);
   stage.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") last = null; });
 
-  // 눈동자가 손가락/마우스를 따라봄
+  // 눈이 손가락/마우스 쪽을 살짝 바라봄
   window.addEventListener("pointermove", (e) => {
     const r = stage.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height * 0.42;
     const dx = e.clientX - cx, dy = e.clientY - cy, d = Math.hypot(dx, dy) || 1;
-    const m = Math.min(6, d / 30);
-    pupilT = { x: dx / d * m, y: dy / d * m };
+    const m = Math.min(4, d / 40);
+    lookT = { x: dx / d * m, y: dy / d * m };
   });
 
   $("sound").addEventListener("click", () => {
@@ -333,14 +329,13 @@
   $("reset").addEventListener("click", () => {
     level = best = count = inks = 0;
     $("cnt").textContent = "0"; $("ink-cnt").textContent = "0"; $("best").textContent = "0%";
-    tier = "idle"; say(idleLines[0]);
   });
 
   // ---------- 애니메이션 루프 ----------
   const eyesOpen = $("eyesOpen"), eyesHappy = $("eyesHappy"), tears = $("tears");
-  const mouthIdle = $("mouthIdle"), mouthLaugh = $("mouthLaugh"), blush = $("blush");
-  const pupils = document.querySelectorAll(".pupil");
+  const blush = $("blush"), snout = $("snout"), hole = $("hole");
   const eyeL = $("eyeL"), eyeR = $("eyeR");
+  const wiggleMarks = $("wiggleMarks"), laughMarks = $("laughMarks");
   let prev = performance.now();
 
   function frame(now) {
@@ -353,59 +348,53 @@
     const laughing = level > 8;
     const L = level / 100;
 
-    // 다리 흔들기
-    const amp = 6 + level * 0.28, speed = 1.6 + level * 0.11;
+    // 다리 꼼지락
+    const amp = 5 + level * 0.22, speed = 1.8 + level * 0.12;
     legs.forEach((g) => {
       const a = g.base + Math.sin(t * speed + g.ph) * amp;
-      g.el.setAttribute("transform", `translate(${g.x} 186) rotate(${a.toFixed(2)})`);
+      const tr = `translate(${g.x} 205) rotate(${a.toFixed(2)})`;
+      g.line.setAttribute("transform", tr);
+      g.fill.setAttribute("transform", tr);
     });
+
+    // 팔 흔들기 (평소엔 천천히 인사, 간지러우면 파닥파닥)
+    const armA = -22 + Math.sin(t * (3 + level * 0.15)) * (14 + level * 0.18);
+    const armTr = `translate(234 176) rotate(${armA.toFixed(2)})`;
+    armLine.setAttribute("transform", armTr);
+    armFill.setAttribute("transform", armTr);
+    wiggleMarks.setAttribute("opacity", laughing ? 0 : (0.55 + Math.sin(t * 3) * 0.45).toFixed(2));
 
     // 몸 흔들림 + 말랑 찌그러짐
     const bob = Math.sin(t * 1.6) * 4;
     const shake = laughing ? Math.sin(t * 38) * (1 + L * 6) : 0;
     const squash = laughing ? Math.sin(t * 14) * (0.02 + L * 0.05) : Math.sin(t * 1.6) * 0.012;
-    const tilt = laughing ? Math.sin(t * 9) * L * 6 : 0;
+    const tilt = laughing ? Math.sin(t * 9) * L * 6 : -4;
     octo.setAttribute("transform",
-      `translate(${shake.toFixed(2)} ${bob.toFixed(2)}) rotate(${tilt.toFixed(2)} 150 200) translate(150 200) scale(${(1 + squash).toFixed(3)} ${(1 - squash).toFixed(3)}) translate(-150 -200)`);
+      `translate(${shake.toFixed(2)} ${bob.toFixed(2)}) rotate(${tilt.toFixed(2)} 150 200) translate(150 210) scale(${(1 + squash).toFixed(3)} ${(1 - squash).toFixed(3)}) translate(-150 -210)`);
 
     // 얼굴
     eyesOpen.style.display = laughing ? "none" : "";
     eyesHappy.style.display = laughing ? "" : "none";
-    mouthIdle.style.display = laughing ? "none" : "";
-    mouthLaugh.style.display = laughing ? "" : "none";
     tears.style.display = level > 60 ? "" : "none";
-    blush.setAttribute("opacity", (0.3 + L * 0.6).toFixed(2));
+    laughMarks.style.display = laughing ? "" : "none";
+    blush.setAttribute("opacity", (0.7 + L * 0.3).toFixed(2));
 
-    // 눈동자 & 깜빡임
-    pupil.x += (pupilT.x - pupil.x) * 0.15; pupil.y += (pupilT.y - pupil.y) * 0.15;
-    pupils.forEach((p) => p.setAttribute("transform", `translate(${pupil.x.toFixed(2)} ${pupil.y.toFixed(2)})`));
+    // 주둥이: 웃으면 오물오물 커짐
+    const sn = laughing ? 1.08 + Math.abs(Math.sin(t * 12)) * (0.1 + L * 0.2) : 1;
+    snout.setAttribute("transform", `translate(147 133) scale(${sn.toFixed(3)}) translate(-147 -133)`);
+    hole.setAttribute("ry", laughing ? (5 + L * 4).toFixed(1) : 4.5);
+    hole.setAttribute("rx", laughing ? (5 + L * 2).toFixed(1) : 4);
+
+    // 시선 & 깜빡임
+    look.x += (lookT.x - look.x) * 0.15; look.y += (lookT.y - look.y) * 0.15;
     if (now > blinkAt) { blinking = now; blinkAt = now + 2200 + Math.random() * 3000; }
-    const b = now - blinking < 140 ? 0.1 : 1;
-    eyeL.setAttribute("transform", `translate(0 136) scale(1 ${b}) translate(0 -136)`);
-    eyeR.setAttribute("transform", `translate(0 136) scale(1 ${b}) translate(0 -136)`);
+    const b = now - blinking < 140 ? 0.12 : 1;
+    eyeL.setAttribute("transform", `translate(${look.x.toFixed(2)} ${look.y.toFixed(2)}) translate(0 135) scale(1 ${b}) translate(0 -135)`);
+    eyeR.setAttribute("transform", `translate(${look.x.toFixed(2)} ${look.y.toFixed(2)}) translate(0 112) scale(1 ${b}) translate(0 -112)`);
 
     // 게이지
     bar.style.width = level.toFixed(1) + "%";
     pct.textContent = Math.round(level) + "%";
-
-    // 말풍선
-    if (now > cooldown) {
-      let next;
-      if (level < 8) next = wasLaughing ? "after" : "idle";
-      else if (level < 35) next = "t1";
-      else if (level < 65) next = "t2";
-      else if (level < 90) next = "t3";
-      else next = "t4";
-      if (level > 8) wasLaughing = true;
-      if (next !== tier) {
-        tier = next;
-        if (tier === "idle") say(idleLines[idleIdx]);
-        else say(lines[tier]);
-        idleTimer = now;
-      }
-      if (tier === "after" && now - idleTimer > 3500) { wasLaughing = false; tier = "idle"; idleIdx = 0; say(idleLines[0]); idleTimer = now; }
-      if (tier === "idle" && now - idleTimer > 4000) { idleIdx = (idleIdx + 1) % idleLines.length; say(idleLines[idleIdx]); idleTimer = now; }
-    }
 
     requestAnimationFrame(frame);
   }
