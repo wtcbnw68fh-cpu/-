@@ -113,11 +113,9 @@
         <g id="octo">
           <!-- 외곽선 레이어 -->
           <g id="legsLine"></g>
-          <g id="armLine"></g>
           <ellipse cx="150" cy="125" rx="102" ry="95" fill="#e2577f" stroke="#2a1d1d" stroke-width="5"/>
           <!-- 채우기 레이어 (머리와 다리 이음새 감추기) -->
           <g id="legsFill"></g>
-          <g id="armFill"></g>
           <ellipse cx="108" cy="68" rx="42" ry="22" fill="#fff" opacity=".16" transform="rotate(-28 108 68)"/>
 
           <!-- 볼터치 -->
@@ -149,14 +147,11 @@
           </g>
 
           <!-- 흔들림 표시 -->
-          <g id="wiggleMarks" stroke="#2a1d1d" stroke-width="3.5" stroke-linecap="round" fill="none">
-            <path d="M268 118 q6 10 4 22"/>
-            <path d="M282 112 q6 10 4 22"/>
-          </g>
           <g id="laughMarks" style="display:none" stroke="#2a1d1d" stroke-width="3.5" stroke-linecap="round" fill="none">
             <path d="M34 92 q-8 12 -4 26"/>
             <path d="M22 100 q-8 12 -4 26"/>
-            <path d="M266 160 q8 -6 10 -18"/>
+            <path d="M266 92 q8 12 4 26"/>
+            <path d="M278 100 q8 12 4 26"/>
           </g>
         </g>
       </svg>
@@ -195,7 +190,7 @@
     for (const k in attrs) e.setAttribute(k, attrs[k]);
     return e;
   }
-  const legs = [98, 124, 150, 176, 202].map((x, i) => {
+  const legs = [94, 118, 140, 160, 182, 206].map((x, i) => {
     const dir = x < 150 ? -1 : 1;
     const line = el("g", {}), fill = el("g", {});
     const pl = el("g", { transform: `scale(${dir} 1)` });
@@ -206,13 +201,6 @@
     $("legsLine").appendChild(line); $("legsFill").appendChild(fill);
     return { line, fill, x, base: -(x - 150) * 0.95, ph: i * 1.3 };
   });
-
-  // ---------- 흔드는 팔 ----------
-  const ARM = "M0 -17 C30 -24 56 -20 66 -8 C73 1 68 11 58 11 C44 11 26 9 0 17 Z";
-  const armLine = el("g", {}), armFill = el("g", {});
-  armLine.appendChild(el("path", { d: ARM, fill: "#e2577f", stroke: "#2a1d1d", "stroke-width": 9, "stroke-linejoin": "round" }));
-  armFill.appendChild(el("path", { d: ARM, fill: "#e2577f" }));
-  $("armLine").appendChild(armLine); $("armFill").appendChild(armFill);
 
   // ---------- 상태 ----------
   let level = 0, best = 0, count = 0, inks = 0;
@@ -335,7 +323,7 @@
   const eyesOpen = $("eyesOpen"), eyesHappy = $("eyesHappy"), tears = $("tears");
   const blush = $("blush"), snout = $("snout"), hole = $("hole");
   const eyeL = $("eyeL"), eyeR = $("eyeR");
-  const wiggleMarks = $("wiggleMarks"), laughMarks = $("laughMarks");
+  const laughMarks = $("laughMarks");
   let prev = performance.now();
 
   function frame(now) {
@@ -357,18 +345,11 @@
       g.fill.setAttribute("transform", tr);
     });
 
-    // 팔 흔들기 (평소엔 천천히 인사, 간지러우면 파닥파닥)
-    const armA = -22 + Math.sin(t * (3 + level * 0.15)) * (14 + level * 0.18);
-    const armTr = `translate(234 176) rotate(${armA.toFixed(2)})`;
-    armLine.setAttribute("transform", armTr);
-    armFill.setAttribute("transform", armTr);
-    wiggleMarks.setAttribute("opacity", laughing ? 0 : (0.55 + Math.sin(t * 3) * 0.45).toFixed(2));
-
     // 몸 흔들림 + 말랑 찌그러짐
     const bob = Math.sin(t * 1.6) * 4;
     const shake = laughing ? Math.sin(t * 38) * (1 + L * 6) : 0;
     const squash = laughing ? Math.sin(t * 14) * (0.02 + L * 0.05) : Math.sin(t * 1.6) * 0.012;
-    const tilt = laughing ? Math.sin(t * 9) * L * 6 : -4;
+    const tilt = laughing ? Math.sin(t * 9) * L * 6 : Math.sin(t * 0.8) * 3;
     octo.setAttribute("transform",
       `translate(${shake.toFixed(2)} ${bob.toFixed(2)}) rotate(${tilt.toFixed(2)} 150 200) translate(150 210) scale(${(1 + squash).toFixed(3)} ${(1 - squash).toFixed(3)}) translate(-150 -210)`);
 
